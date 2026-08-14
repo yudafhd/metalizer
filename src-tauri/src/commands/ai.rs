@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tauri::{command, State};
 
 use crate::ai::gemini::GeminiMetadataProvider;
+use crate::ai::provider::MetadataProvider;
 use crate::errors::command_error;
 use crate::models::{ApiStatus, GenerateMetadataRequest, MetadataGenerationResult};
 use crate::state::AppState;
@@ -19,7 +20,7 @@ pub async fn generate_metadata(
         .map_err(|_| "Could not access API key state".to_string())?
         .as_ref()
         .map(|value| value.to_string())
-        .ok_or_else(|| "Gemini API key is not configured".to_string())?;
+        .ok_or_else(|| "Gemini API key belum diatur".to_string())?;
     let cancellation = Arc::new(AtomicBool::new(false));
     tracing::info!(batch_id = %request.batch_id, asset_count = request.expected_ids.len(), "metadata batch started");
     state
@@ -28,9 +29,10 @@ pub async fn generate_metadata(
         .map_err(|_| "Could not access cancellation state".to_string())?
         .insert(request.batch_id.clone(), cancellation.clone());
     let provider = GeminiMetadataProvider::new(api_key, cancellation);
-    let result = provider.generate(&request).await.map_err(command_error);
+    let provider_name = provider.provider_name();
+    let result = provider.generate_metadata(&request).await.map_err(command_error);
     if result.is_ok() {
-        tracing::info!(batch_id = %request.batch_id, "metadata batch completed");
+        tracing::info!(batch_id = %request.batch_id, provider = provider_name, "metadata batch completed");
     } else {
         tracing::warn!(batch_id = %request.batch_id, "metadata batch failed");
     }
@@ -58,7 +60,7 @@ pub fn cancel_generation(batch_id: String, state: State<'_, AppState>) -> Result
 pub fn set_api_key(api_key: String, state: State<'_, AppState>) -> Result<(), String> {
     let value = api_key.trim();
     if value.len() < 10 {
-        return Err("Gemini API key appears too short".to_string());
+        return Err("Gemini API key terlalu pendek".to_string());
     }
     let mut stored = state
         .api_key
@@ -88,7 +90,7 @@ pub async fn test_api_key(api_key: Option<String>, state: State<'_, AppState>) -
             .map_err(|_| "Could not access API key state".to_string())?
             .as_ref()
             .map(|value| value.to_string())
-            .ok_or_else(|| "Gemini API key is not configured".to_string())?,
+            .ok_or_else(|| "Gemini API key belum diatur".to_string())?,
     };
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(15))
@@ -112,19 +114,19 @@ pub async fn test_api_key(api_key: Option<String>, state: State<'_, AppState>) -
         Ok(ApiStatus {
             connected: false,
             status: "rateLimited".to_string(),
-            message: Some("Gemini rate limit reached. Try again later.".to_string()),
+            message: Some("Batas request Gemini tercapai. Coba lagi nanti.".to_string()),
         })
     } else if status.as_u16() == 400 || status.as_u16() == 401 || status.as_u16() == 403 {
         Ok(ApiStatus {
             connected: false,
             status: "invalid".to_string(),
-            message: Some("Gemini rejected this API key.".to_string()),
+            message: Some("Gemini menolak API key ini.".to_string()),
         })
     } else {
         Ok(ApiStatus {
             connected: false,
             status: "failed".to_string(),
-            message: Some(format!("Gemini connection failed with HTTP {}", status.as_u16())),
+            message: Some(format!("Koneksi Gemini gagal dengan HTTP {}", status.as_u16())),
         })
     }
 }

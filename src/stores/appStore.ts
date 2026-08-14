@@ -1,15 +1,17 @@
 import { create } from "zustand";
 
-import type { AppSettings, AssetStatus, BatchJob, GenerationProgress, StockAsset } from "../types";
+import { GEMINI_MODELS } from "../constants/models";
+import type { AppSettings, AssetStatus, BatchJob, DailyUsage, GenerationProgress, GeminiUsageMetadata, StockAsset } from "../types";
+import { emptyDailyUsage, todayKey, usageToDailyDelta } from "../services/usage";
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  model: "gemini-2.5-flash",
+  model: GEMINI_MODELS.balanced,
   modelPreset: "balanced",
   customModel: "",
   batchSize: 6,
   concurrency: 2,
   metadataMode: "balanced",
-  targetKeywords: 40,
+  targetKeywords: 30,
   contactSheetQuality: 85,
   maxSheetSize: 2048,
   background: "neutral",
@@ -32,6 +34,7 @@ interface AppStore {
   isGenerating: boolean;
   apiKeyConfigured: boolean;
   apiKeyVerified: boolean;
+  dailyUsage: DailyUsage;
   progress: GenerationProgress;
   notices: Notice[];
   setAssets: (assets: StockAsset[]) => void;
@@ -51,6 +54,8 @@ interface AppStore {
   setGenerating: (value: boolean) => void;
   setApiKeyConfigured: (value: boolean) => void;
   setApiKeyVerified: (value: boolean) => void;
+  setDailyUsage: (usage: DailyUsage) => void;
+  recordGeminiUsage: (usage: GeminiUsageMetadata) => void;
   setProgress: (progress: GenerationProgress) => void;
   patchProgress: (patch: Partial<GenerationProgress>) => void;
   addNotice: (tone: Notice["tone"], message: string) => void;
@@ -66,6 +71,7 @@ export const useAppStore = create<AppStore>((set) => ({
   isGenerating: false,
   apiKeyConfigured: false,
   apiKeyVerified: false,
+  dailyUsage: emptyDailyUsage(),
   progress: { total: 0, completed: 0, processing: 0, queuedBatches: 0, cancelled: false },
   notices: [],
   setAssets: (assets) => set({ assets }),
@@ -89,6 +95,12 @@ export const useAppStore = create<AppStore>((set) => ({
   setGenerating: (isGenerating) => set({ isGenerating }),
   setApiKeyConfigured: (apiKeyConfigured) => set({ apiKeyConfigured }),
   setApiKeyVerified: (apiKeyVerified) => set({ apiKeyVerified }),
+  setDailyUsage: (dailyUsage) => set({ dailyUsage }),
+  recordGeminiUsage: (usage) => set((state) => {
+    const current = state.dailyUsage.date === todayKey() ? state.dailyUsage : emptyDailyUsage();
+    const delta = usageToDailyDelta(usage);
+    return { dailyUsage: { ...current, requests: current.requests + delta.requests, promptTokens: current.promptTokens + delta.promptTokens, outputTokens: current.outputTokens + delta.outputTokens, totalTokens: current.totalTokens + delta.totalTokens } };
+  }),
   setProgress: (progress) => set({ progress }),
   patchProgress: (patch) => set((state) => ({ progress: { ...state.progress, ...patch } })),
   addNotice: (tone, message) => set((state) => ({ notices: [...state.notices, { id: crypto.randomUUID(), tone, message }] })),

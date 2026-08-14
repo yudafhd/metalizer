@@ -5,9 +5,9 @@ You are a professional commercial stock metadata specialist focused on Adobe Sto
 You will receive one contact sheet containing up to six independent stock assets. Each asset is clearly identified by a numeric panel ID. Treat every panel as a completely independent stock asset.
 Never transfer subjects, objects, attributes, locations, concepts, demographics, actions, colors, styles, or keywords from one panel to another. Analyze every panel independently.
 
-TITLE: Create one concise, natural English title describing the strongest visible subject, activity, setting, or concept. Target 35-65 characters and never exceed 70 characters. Do not use trademarks, brand names, artist names, unsupported names of real people, camera equipment metadata, meaningless marketing phrases, filenames, or information that cannot reasonably be inferred.
+TITLE: Create one concise, natural English title of approximately 5-10 words describing what the image is, its visible style, and what is happening. Target 35-65 characters and never exceed 70 characters. Write a readable short phrase, not a keyword list. Do not use trademarks, brand names, artist names, unsupported names of real people, camera equipment metadata, meaningless marketing phrases, filenames, or information that cannot reasonably be inferred.
 
-KEYWORDS: Generate high-quality English search keywords describing actual visual content. Generate approximately 30-45 strong keywords when the image supports them, but never force irrelevant keywords. Each keyword may be a single word or useful search phrase. Never duplicate keywords. Preserve commercial relevance order; the first 10 keywords are the most important. Prioritize primary subject, action, strongest concept, important attributes, environment, commercial concepts, secondary objects, and visual characteristics. Do not invent objects, specific locations, ethnicity, profession, relationship, medical condition, religion, nationality, or identity unless clearly supported. Do not use trademarks, brand names, or filenames.
+KEYWORDS: Generate 20-35 high-quality English search keywords, and only add more when each extra keyword is clearly useful and directly supported. Never fill the list with generic or promotional terms. Each keyword may be a single word or useful search phrase. Never duplicate keywords. Preserve this exact relevance order: positions 1-10 must contain the most specific literal subjects, actions, and visible attributes; after that add conceptual buyer intent and themes; only then add technical/style terms such as illustration, vector, cartoon, or isolated when the image truly shows them. Do not invent objects, specific locations, ethnicity, profession, relationship, medical condition, religion, nationality, or identity unless clearly supported. Never use trademarks, brand names, artist names, logos, product names, filenames, or spam terms such as best, amazing, beautiful, trending, viral, premium, or 4k.
 
 CATEGORY: Choose exactly one Adobe Stock category ID from the provided category list.
 
@@ -24,7 +24,7 @@ fn mode_modifier(mode: &str) -> &'static str {
 
 pub fn system_prompt(mode: &str, target_keywords: u8, scope: &str) -> String {
     format!(
-        "{}\n\nMODE: {}\nTARGET KEYWORDS: approximately {} when supported by the image.\nGENERATION SCOPE: {}. Still return the complete schema for each panel, but focus the requested field when this is not full.\n",
+        "{}\n\nMODE: {}\nTARGET KEYWORDS: {} relevant keywords, staying within 20-35 and stopping early when additional terms would be generic or uncertain.\nGENERATION SCOPE: {}. Still return the complete schema for each panel, but focus the requested field when this is not full.\n",
         BASE_SYSTEM_PROMPT,
         mode_modifier(mode),
         target_keywords,

@@ -16,7 +16,7 @@ import type {
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
 export async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauri) throw new Error("This action is available in the desktop application");
+  if (!isTauri) throw new Error("Aksi ini hanya tersedia di aplikasi desktop");
   return invoke<T>(command, args);
 }
 
@@ -32,7 +32,8 @@ export async function chooseImages(): Promise<string[]> {
 
 export async function chooseFolder(): Promise<string | null> {
   const selected = await open({ directory: true, multiple: false });
-  return typeof selected === "string" ? selected : null;
+  if (typeof selected === "string") return selected;
+  return Array.isArray(selected) ? selected[0] ?? null : null;
 }
 
 export async function chooseCsvOutput(defaultPath = "adobe-stock-metadata.csv"): Promise<string | null> {

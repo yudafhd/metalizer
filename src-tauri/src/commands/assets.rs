@@ -31,16 +31,17 @@ fn scan_folder_sync(path: String) -> AppResult<FolderImageResult> {
     let root = PathBuf::from(path);
     if !root.is_dir() {
         return Err(AppError::InvalidRequest(
-            "Selected folder does not exist or is not a directory".to_string(),
+            "Folder yang dipilih tidak ada atau bukan folder".to_string(),
         ));
     }
     let mut paths = Vec::new();
     collect_file_paths(&root, &mut paths)?;
     let assets = inspect_paths(paths.iter().map(|path| path.to_string_lossy().into_owned()).collect())
         ?;
+    let valid_count = assets.len();
     Ok(FolderImageResult {
         paths: assets.into_iter().map(|asset| asset.path).collect(),
-        rejected_count: paths.len().saturating_sub(assets.len()),
+        rejected_count: paths.len().saturating_sub(valid_count),
     })
 }
 

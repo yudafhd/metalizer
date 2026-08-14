@@ -83,6 +83,22 @@ pub struct MetadataGenerationResult {
     pub missing_ids: Vec<String>,
     pub warnings: Vec<String>,
     pub attempts: u8,
+    pub usage: GeminiUsageMetadata,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeminiUsageMetadata {
+    #[serde(default)]
+    pub prompt_token_count: u64,
+    #[serde(default)]
+    pub candidates_token_count: u64,
+    #[serde(default)]
+    pub total_token_count: u64,
+    #[serde(default)]
+    pub cached_content_token_count: u64,
+    #[serde(default)]
+    pub thoughts_token_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

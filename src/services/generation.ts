@@ -1,7 +1,8 @@
 import { cancelGeneration, cleanupTempFile, createContactSheet, generateMetadata } from "./tauri";
-import { emptyMetadata, normalizeKeywords, qualityScore, validateMetadata } from "../utils/metadata";
+import { emptyMetadata, IDEAL_KEYWORD_MAX, IDEAL_KEYWORD_MIN, normalizeKeywords, prioritizeKeywords, qualityScore, validateMetadata } from "../utils/metadata";
 import { chunkItems } from "../utils/batching";
 import { useAppStore } from "../stores/appStore";
+import { writeDailyUsage } from "./usage";
 import type { AppSettings, AssetStatus, BatchJob, GeneratedMetadata, MetadataMode, StockAsset, StockMetadata } from "../types";
 
 const activeBatchIds = new Set<string>();
@@ -11,11 +12,11 @@ export async function runGeneration(options: { onlyFailed?: boolean; assetIds?: 
   const store = useAppStore.getState();
   if (store.isGenerating) return;
   if (!store.apiKeyConfigured || !store.apiKeyVerified) {
-    store.addNotice("warning", "Gemini API key is required. Open Settings to configure it.");
+    store.addNotice("warning", "Gemini API key wajib diisi. Buka Settings untuk mengaturnya.");
     return;
   }
   if (store.settings.modelPreset === "custom" && !store.settings.customModel.trim()) {
-    store.addNotice("error", "Custom model ID is empty. Set a valid Gemini model in Settings.");
+    store.addNotice("error", "ID model khusus masih kosong. Pilih model Gemini yang valid di Settings.");
     return;
   }
   const candidates = store.assets.filter((asset) => {
@@ -23,7 +24,7 @@ export async function runGeneration(options: { onlyFailed?: boolean; assetIds?: 
     return options.onlyFailed ? asset.status === "failed" || Boolean(options.assetIds?.includes(asset.id)) : asset.status !== "completed";
   });
   if (!candidates.length) {
-    store.addNotice("info", "There are no assets waiting for metadata generation.");
+    store.addNotice("info", "Tidak ada aset yang menunggu untuk di-generate.");
     return;
   }
   cancelRequested = false;
@@ -62,7 +63,7 @@ export async function runGeneration(options: { onlyFailed?: boolean; assetIds?: 
     queuedBatches: store.jobs.filter((job) => job.status === "queued" || job.status === "preparing" || job.status === "processing").length,
     cancelled: cancelRequested,
   });
-  if (cancelRequested) store.addNotice("info", "Generation cancelled. Completed metadata was kept.");
+  if (cancelRequested) store.addNotice("info", "Generate dibatalkan. Metadata yang sudah selesai tetap disimpan.");
 }
 
 export async function cancelActiveGeneration(): Promise<void> {
@@ -110,12 +111,14 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
         targetKeywords: settings.targetKeywords,
         generationScope: scope,
       });
+      store.recordGeminiUsage(response.usage);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
       const responseById = new Map(response.assets.map((asset) => [asset.id, asset]));
       for (const panel of panelAssets) {
         const generated = responseById.get(panel.panelId);
         const sourceAsset = remainingAssets.find((asset) => asset.id === findAssetId(panelAssets, panel.panelId, remainingAssets));
         if (!generated || !sourceAsset) continue;
-        applyGeneratedMetadata(sourceAsset, generated, settings.metadataMode, scope);
+        applyGeneratedMetadata(sourceAsset, generated, settings.metadataMode, scope, settings.targetKeywords);
       }
       const missing = new Set(response.missingIds);
       const completedIds = panelAssets.filter((panel) => !missing.has(panel.panelId)).map((panel) => findAssetId(panelAssets, panel.panelId, remainingAssets));
@@ -144,19 +147,20 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
 
   if (cancelRequested) {
     remainingAssets.forEach((asset) => store.setAssetStatus(asset.id, "queued"));
-    store.updateJob(job.id, { status: "queued", error: "Cancelled" });
+    store.updateJob(job.id, { status: "queued", error: "Dibatalkan" });
   } else if (remainingAssets.length) {
-    const message = lastError ?? "Gemini did not return metadata for every panel after three partial retries.";
+    const message = lastError ?? "Gemini belum mengembalikan metadata untuk semua panel setelah tiga kali percobaan.";
     remainingAssets.forEach((asset) => store.setAssetStatus(asset.id, "failed", message));
     store.updateJob(job.id, { status: "failed", error: message });
-    store.addNotice("error", `${job.id} failed: ${message}`);
+    store.addNotice("error", `${job.id} gagal: ${message}`);
   }
 }
 
-function applyGeneratedMetadata(asset: StockAsset, generated: GeneratedMetadata, mode: MetadataMode, scope: "full" | "title" | "keywords"): void {
+function applyGeneratedMetadata(asset: StockAsset, generated: GeneratedMetadata, mode: MetadataMode, scope: "full" | "title" | "keywords", targetKeywords: number): void {
   const store = useAppStore.getState();
   const previous = asset.metadata ?? emptyMetadata(asset, mode);
-  const keywords = normalizeKeywords(generated.keywords, asset.filename, 49);
+  const target = Math.max(IDEAL_KEYWORD_MIN, Math.min(IDEAL_KEYWORD_MAX, targetKeywords));
+  const keywords = prioritizeKeywords(normalizeKeywords(generated.keywords, asset.filename, 49), generated.title).slice(0, target);
   const draft: StockMetadata = {
     ...previous,
     assetId: asset.id,
@@ -178,7 +182,7 @@ function applyGeneratedMetadata(asset: StockAsset, generated: GeneratedMetadata,
     error: undefined,
   });
   if (validation.warnings.length) {
-    store.addNotice("warning", `${asset.filename}: ${validation.warnings[0]?.message ?? "Review metadata"}`);
+    store.addNotice("warning", `${asset.filename}: ${validation.warnings[0]?.message ?? "Cek metadata"}`);
   }
 }
 

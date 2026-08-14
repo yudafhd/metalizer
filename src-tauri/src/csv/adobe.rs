@@ -33,7 +33,7 @@ pub fn export_csv(request: &CsvExportRequest) -> AppResult<CsvExportResult> {
             let last = chunk.pop().expect("chunk has at least one row");
             if chunk.is_empty() {
                 return Err(crate::errors::AppError::InvalidRequest(
-                    "A single CSV row exceeds the 1 MB export limit".to_string(),
+                    "Satu baris CSV melebihi batas export 1 MB".to_string(),
                 ));
             }
             write_chunk(&base_path, &mut files, &chunk, request.include_releases, chunk_number, true)?;
@@ -42,7 +42,7 @@ pub fn export_csv(request: &CsvExportRequest) -> AppResult<CsvExportResult> {
             chunk.push(last);
             if render_chunk(&chunk, request.include_releases)?.len() > MAX_BYTES {
                 return Err(crate::errors::AppError::InvalidRequest(
-                    "A single CSV row exceeds the 1 MB export limit".to_string(),
+                    "Satu baris CSV melebihi batas export 1 MB".to_string(),
                 ));
             }
         }

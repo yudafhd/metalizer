@@ -57,5 +57,5 @@ pub fn run() {
             commands::settings::cleanup_temp_file,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Adobe Stock Metadata Generator");
+        .expect("error while running Metalizer - Microstock Metadata");
 }

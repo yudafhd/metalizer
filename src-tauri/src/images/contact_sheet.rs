@@ -5,7 +5,7 @@ use image::imageops::{overlay, resize, FilterType};
 use image::{DynamicImage, Rgba, RgbaImage};
 
 use crate::errors::{AppError, AppResult};
-use crate::models::{ContactSheetAsset, ContactSheetRequest, ContactSheetResult};
+use crate::models::{ContactSheetRequest, ContactSheetResult};
 
 const GAP: u32 = 18;
 const HEADER: u32 = 58;

@@ -1,12 +1,23 @@
 import { preferencesStore } from "./store";
 
+import { GEMINI_MODELS, LEGACY_GEMINI_MODELS } from "../constants/models";
 import type { AppSettings } from "../types";
 
 const settingsKey = "app-settings";
 
 export async function readSettings(defaults: AppSettings): Promise<AppSettings> {
   if (!("__TAURI_INTERNALS__" in window)) return defaults;
-  return (await preferencesStore.get<AppSettings>(settingsKey)) ?? defaults;
+  const stored = await preferencesStore.get<AppSettings>(settingsKey);
+  if (!stored) return defaults;
+  const targetKeywords = Number.isFinite(stored.targetKeywords) ? Math.max(20, Math.min(35, stored.targetKeywords)) : defaults.targetKeywords;
+  if (LEGACY_GEMINI_MODELS.has(stored.model)) {
+    return {
+      ...stored,
+      targetKeywords,
+      model: stored.modelPreset === "fast" ? GEMINI_MODELS.fast : stored.modelPreset === "balanced" ? GEMINI_MODELS.balanced : stored.model,
+    };
+  }
+  return { ...stored, targetKeywords };
 }
 
 export async function writeSettings(settings: AppSettings): Promise<void> {

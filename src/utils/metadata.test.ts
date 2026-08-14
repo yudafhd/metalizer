@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { chunkItems, panelIds } from "./batching";
 import { serializeAdobeCsv } from "./csv";
-import { normalizeKeywords, qualityScore, validateMetadata } from "./metadata";
+import { normalizeKeywords, prioritizeKeywords, qualityScore, validateMetadata } from "./metadata";
 
 describe("batching", () => {
   it.each([
@@ -24,6 +24,14 @@ describe("metadata normalization", () => {
     expect(normalizeKeywords(["Cat", " orange  cat ", "cat", "cat-001.jpg", "pet"], "cat-001.jpg")).toEqual(["Cat", "orange cat", "pet"]);
   });
 
+  it("removes obvious spam and trademark terms", () => {
+    expect(normalizeKeywords(["pancake", "best", "Nike", "blueberry", "premium"], "asset.jpg")).toEqual(["pancake", "blueberry"]);
+  });
+
+  it("promotes title subjects while keeping the existing order otherwise", () => {
+    expect(prioritizeKeywords(["breakfast", "blueberry", "plate", "pancakes", "sweet"], "Blueberry pancakes on plate")).toEqual(["blueberry", "plate", "pancakes", "breakfast", "sweet"]);
+  });
+
   it("flags a long title and invalid category", () => {
     const result = validateMetadata("asset.jpg", { title: "A".repeat(71), keywords: ["one"], category: 99 });
     expect(result.valid).toBe(false);
@@ -33,6 +41,11 @@ describe("metadata normalization", () => {
   it("warns when the title repeats the filename", () => {
     const result = validateMetadata("orange-cat-001.jpg", { title: "Orange cat 001 on sofa", keywords: ["cat", "sofa"], category: 1 });
     expect(result.warnings.map((warning) => warning.code)).toContain("title-filename");
+  });
+
+  it("warns when the title is not a short natural phrase", () => {
+    const result = validateMetadata("asset.jpg", { title: "Cat", keywords: Array.from({ length: 20 }, (_, index) => `keyword ${index}`), category: 1 });
+    expect(result.warnings.map((warning) => warning.code)).toContain("title-word-count");
   });
 
   it("scores complete metadata higher than incomplete metadata", () => {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Adobe Stock Metadata Generator",
+  "productName": "Metalizer - Microstock Metadata",
   "version": "0.1.0",
   "identifier": "com.yudafhd.adobestockmetadatagenerator",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Adobe Stock Metadata Generator",
+        "title": "Metalizer - Microstock Metadata",
         "width": 1440,
         "height": 920,
         "minWidth": 1100,
@@ -29,6 +29,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "shortDescription": "Batch Adobe Stock metadata generation",
     "longDescription": "Generate, review, validate, and export Adobe Stock metadata locally with Gemini.",
     "category": "Utility"

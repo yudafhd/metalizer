@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use crate::ai::prompts::{system_prompt, user_prompt};
 use crate::ai::schema::metadata_response_schema;
 use crate::errors::{AppError, AppResult};
-use crate::models::{GeneratedMetadata, GenerateMetadataRequest, MetadataGenerationResult};
+use crate::models::{GeminiUsageMetadata, GeneratedMetadata, GenerateMetadataRequest, MetadataGenerationResult};
 
 pub struct GeminiMetadataProvider {
     api_key: String,
@@ -60,7 +60,6 @@ impl GeminiMetadataProvider {
                 ]
             }],
             "generationConfig": {
-                "temperature": 0.15,
                 "responseMimeType": "application/json",
                 "responseSchema": metadata_response_schema(),
                 "maxOutputTokens": 8192
@@ -113,7 +112,7 @@ impl GeminiMetadataProvider {
         }
 
         Err(last_error.unwrap_or_else(|| {
-            AppError::Network("Gemini request failed after three attempts".to_string())
+            AppError::Network("Request Gemini gagal setelah tiga kali percobaan".to_string())
         }))
     }
 
@@ -222,9 +221,14 @@ fn parse_response(
         .and_then(|parts| parts.iter().find_map(|part| part.get("text")))
         .and_then(Value::as_str)
         .ok_or_else(|| {
-            AppError::GeminiResponse("Gemini response did not contain candidate text".to_string())
+            AppError::GeminiResponse("Respons Gemini tidak berisi teks hasil".to_string())
         })?;
     let parsed: StructuredOutput = parse_json_text(text)?;
+    let usage = payload
+        .get("usageMetadata")
+        .cloned()
+        .and_then(|value| serde_json::from_value::<GeminiUsageMetadata>(value).ok())
+        .unwrap_or_default();
     let expected: HashSet<&str> = request.expected_ids.iter().map(String::as_str).collect();
     let mut seen = HashSet::new();
     let mut warnings = Vec::new();
@@ -254,7 +258,7 @@ fn parse_response(
         .collect::<Vec<_>>();
     if assets.is_empty() {
         return Err(AppError::GeminiResponse(
-            "Gemini returned no valid panel metadata".to_string(),
+            "Gemini tidak mengembalikan metadata panel yang valid".to_string(),
         ));
     }
     Ok(MetadataGenerationResult {
@@ -263,6 +267,7 @@ fn parse_response(
         missing_ids,
         warnings,
         attempts: 1,
+        usage,
     })
 }
 

@@ -3,25 +3,124 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #17212b;
-  background: #f7f8f9;
+  font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #102a43;
+  background: #dbe5ef;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 1100px; min-height: 100vh; background: #f7f8f9; }
+body {
+  margin: 0;
+  min-width: 1100px;
+  min-height: 100vh;
+  background: #dbe5ef;
+  color: #102a43;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Custom low-glare scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #edf3fa;
+}
+::-webkit-scrollbar-thumb {
+  background: #82b7ff;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8;
+}
+
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
+/* The custom password visibility button replaces WebView2's native reveal icon. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+@keyframes splash-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@keyframes splash-logo-ring {
+  0%, 100% { transform: scale(0.98); opacity: 0.6; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+.splash-progress {
+  width: 0%;
+  animation: splash-progress 3s ease-in-out forwards;
+}
+
+.splash-logo-ring {
+  animation: splash-logo-ring 2.2s ease-in-out infinite;
+}
+
 @layer components {
-  .app-button { @apply inline-flex h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-[12px] font-semibold text-ink transition hover:border-slate-400 hover:bg-slatepanel disabled:opacity-45; }
-  .app-button-primary { @apply border-accent bg-accent text-white hover:border-accent-dark hover:bg-accent-dark; }
-  .app-button-quiet { @apply border-transparent bg-transparent text-slate-500 hover:border-line hover:bg-white hover:text-ink; }
-  .app-input { @apply h-9 w-full rounded-md border border-line bg-white px-3 text-[13px] text-ink outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/10; }
-  .app-select { @apply h-9 w-full rounded-md border border-line bg-white px-3 text-[13px] text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/10 appearance-none; }
-  .panel { @apply rounded-lg border border-line bg-white shadow-panel; }
-  .eyebrow { @apply text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400; }
+  .app-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-raspberry-200 bg-surface px-4 text-[13px] font-semibold text-raspberry-800 shadow-sm transition hover:border-raspberry-300 hover:bg-raspberry-50 hover:text-raspberry-900 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-[.45];
+    background-image: linear-gradient(180deg, #f9fcff 0%, #e5eef8 100%);
+    border-color: #b8cbe1;
+    color: #17365f;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 10px -7px rgba(11, 31, 77, 0.55);
+  }
+  .app-button:hover {
+    background-image: linear-gradient(180deg, #ffffff 0%, #dceafe 100%);
+    border-color: #79a8df;
+    color: #0b1f4d;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 14px -9px rgba(11, 31, 77, 0.75);
+    transform: translateY(-1px);
+  }
+  .app-button-primary {
+    @apply border-raspberry-600 bg-raspberry-600 text-white shadow-raspberry hover:border-raspberry-700 hover:bg-raspberry-700;
+    background-image: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+    border-color: #2563eb;
+    color: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 18px -6px rgba(29, 78, 216, 0.55);
+  }
+  .app-button-primary:hover {
+    background-image: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%);
+    border-color: #2563eb;
+    color: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 22px -6px rgba(37, 99, 235, 0.65);
+    transform: translateY(-1px);
+  }
+  .app-button-quiet {
+    @apply border-transparent bg-transparent text-raspberry-700 shadow-none hover:border-raspberry-200 hover:bg-raspberry-50 hover:text-raspberry-900;
+    background-image: none;
+    box-shadow: none;
+  }
+  .app-button-quiet:hover {
+    background-image: linear-gradient(135deg, #eaf2ff 0%, #d7e7ff 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    color: #0b1f4d;
+  }
+  .app-input {
+    @apply h-10 w-full rounded-xl border border-raspberry-100 bg-surface px-3.5 text-[14px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-raspberry-500 focus:ring-2 focus:ring-raspberry-500/15;
+  }
+  .app-select {
+    @apply h-10 w-full rounded-xl border border-raspberry-100 bg-surface px-3.5 text-[14px] font-medium text-slate-900 outline-none transition focus:border-raspberry-500 focus:ring-2 focus:ring-raspberry-500/15 appearance-none;
+  }
+  .panel {
+    @apply rounded-2xl border border-raspberry-100 bg-surface shadow-panel;
+  }
+  .settings-sheet {
+    box-shadow: -18px 0 40px -24px rgba(15, 23, 42, 0.42);
+  }
+  .eyebrow {
+    @apply text-[10px] font-extrabold uppercase tracking-[0.16em] text-raspberry-600;
+  }
 }

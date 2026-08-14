@@ -20,6 +20,7 @@ pub fn normalize_keywords(raw: &[String], filename: &str, maximum: usize) -> Vec
             || lower.contains(".jpeg")
             || lower.contains(".png")
             || lower.contains(".webp")
+            || is_unsafe_keyword(&lower)
             || !seen.insert(lower)
         {
             continue;
@@ -30,4 +31,18 @@ pub fn normalize_keywords(raw: &[String], filename: &str, maximum: usize) -> Vec
         }
     }
     normalized
+}
+
+fn is_unsafe_keyword(keyword: &str) -> bool {
+    keyword.contains('™')
+        || keyword.contains('®')
+        || matches!(
+            keyword,
+            "best" | "amazing" | "beautiful" | "fantastic" | "free" | "hd" | "4k" | "premium"
+                | "trending" | "viral" | "sale" | "buy now" | "click here" | "adobe"
+                | "adidas" | "amazon" | "chatgpt" | "coca cola" | "disney" | "facebook"
+                | "gemini" | "google" | "instagram" | "iphone" | "ipad" | "kfc" | "lego"
+                | "mcdonalds" | "microsoft" | "netflix" | "nike" | "pepsi" | "photoshop"
+                | "pinterest" | "samsung" | "starbucks" | "tesla" | "twitter" | "youtube"
+        )
 }

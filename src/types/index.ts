@@ -126,6 +126,23 @@ export interface MetadataGenerationResult {
   missingIds: string[];
   warnings: string[];
   attempts: number;
+  usage: GeminiUsageMetadata;
+}
+
+export interface GeminiUsageMetadata {
+  promptTokenCount: number;
+  candidatesTokenCount: number;
+  totalTokenCount: number;
+  cachedContentTokenCount: number;
+  thoughtsTokenCount: number;
+}
+
+export interface DailyUsage {
+  date: string;
+  requests: number;
+  promptTokens: number;
+  outputTokens: number;
+  totalTokens: number;
 }
 
 export interface ApiStatus {

@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use tauri::{command, State};
+use tauri::{command, AppHandle, State};
 
 use crate::ai::gemini::GeminiMetadataProvider;
 use crate::ai::provider::MetadataProvider;
@@ -12,8 +12,10 @@ use crate::state::AppState;
 #[command]
 pub async fn generate_metadata(
     request: GenerateMetadataRequest,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<MetadataGenerationResult, String> {
+    crate::commands::license::require_license(&app)?;
     let api_key = state
         .api_key
         .lock()

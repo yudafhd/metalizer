@@ -10,6 +10,7 @@ import type {
   CsvExportResult,
   GenerateMetadataRequest,
   MetadataGenerationResult,
+  LicenseStatus,
   ValidationResult,
 } from "../types";
 
@@ -34,6 +35,14 @@ export async function chooseFolder(): Promise<string | null> {
   const selected = await open({ directory: true, multiple: false });
   if (typeof selected === "string") return selected;
   return Array.isArray(selected) ? selected[0] ?? null : null;
+}
+
+export function getLicenseStatus(): Promise<LicenseStatus> {
+  return invokeCommand("license_status");
+}
+
+export function activateLicense(licenseCode: string, email: string): Promise<LicenseStatus> {
+  return invokeCommand("activate_license", { licenseCode, email });
 }
 
 export async function chooseCsvOutput(defaultPath = "adobe-stock-metadata.csv"): Promise<string | null> {

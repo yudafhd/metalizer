@@ -151,6 +151,21 @@ export interface ApiStatus {
   message?: string;
 }
 
+export interface LicenseStatus {
+  valid: boolean;
+  activated: boolean;
+  product?: string;
+  email?: string;
+  license_id?: string;
+  activation_expires_at?: string;
+  expires_at?: string;
+  perpetual: boolean;
+  device_bound: boolean;
+  activated_at?: string;
+  last_validated_at?: string;
+  message?: string;
+}
+
 export interface ValidationResult {
   valid: boolean;
   warnings: MetadataWarning[];

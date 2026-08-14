@@ -55,6 +55,8 @@ pub fn run() {
             commands::metadata::calculate_quality_score,
             commands::export::export_csv_file,
             commands::settings::cleanup_temp_file,
+            commands::license::license_status,
+            commands::license::activate_license,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Metalizer - Microstock Metadata");

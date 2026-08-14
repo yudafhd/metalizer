@@ -4,19 +4,20 @@ import { AlertTriangle, CloudOff, Download, FileWarning, LoaderCircle } from "lu
 import { NoticeStack } from "./components/common/NoticeStack";
 import { GuideModal } from "./components/common/GuideModal";
 import { SplashScreen } from "./components/common/SplashScreen";
+import { LicenseGate } from "./components/common/LicenseGate";
 import { Inspector } from "./components/metadata/Inspector";
 import { MetadataTable } from "./components/metadata/MetadataTable";
 import { TopBar } from "./components/layout/TopBar";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { useAppStore } from "./stores/appStore";
 import { cancelActiveGeneration, runGeneration } from "./services/generation";
-import { deleteApiKey, exportCsvFile, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
+import { activateLicense, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
 import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
 import { formatTokenCount, readDailyUsage } from "./services/usage";
 import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata";
 import { serializeAdobeCsv } from "./utils/csv";
-import type { ApiStatus, CsvExportRequest, MetadataMode, StockAsset, StockMetadata } from "./types";
+import type { ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
 
 export default function App() {
   const assets = useAppStore((state) => state.assets);
@@ -39,6 +40,9 @@ export default function App() {
   const [isAddingAssets, setIsAddingAssets] = useState(false);
   const [exportIssues, setExportIssues] = useState<string[] | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>();
+  const [licenseBusy, setLicenseBusy] = useState(true);
+  const [licenseError, setLicenseError] = useState<string>();
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,6 +76,8 @@ export default function App() {
     window.addEventListener("offline", handleOffline);
     return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
   }, []); // settings are intentionally loaded once at startup
+
+  useEffect(() => { void getLicenseStatus().then(setLicenseStatus).catch((error) => setLicenseError(error instanceof Error ? error.message : String(error))).finally(() => setLicenseBusy(false)); }, []);
 
   useEffect(() => { if (settingsHydrated) void writeSettings(settings); }, [settings, settingsHydrated]);
 
@@ -161,6 +167,11 @@ export default function App() {
   const handleGenerate = () => { void runGeneration(); };
   const handleCancel = () => { void cancelActiveGeneration(); };
 
+  const handleActivateLicense = async (email: string, code: string) => {
+    setLicenseBusy(true); setLicenseError(undefined);
+    try { setLicenseStatus(await activateLicense(code, email)); } catch (error) { setLicenseError(error instanceof Error ? error.message : String(error)); } finally { setLicenseBusy(false); }
+  };
+
   const saveKey = async (value: string) => {
     await saveApiKey(value);
     await setApiKey(value);
@@ -201,6 +212,7 @@ export default function App() {
   };
 
   if (showSplash) return <SplashScreen />;
+  if (!licenseStatus?.valid) return <LicenseGate status={licenseStatus} busy={licenseBusy} error={licenseError} onActivate={handleActivateLicense} />;
 
   return <div className="flex h-screen flex-col overflow-hidden bg-surface-muted" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
     <TopBar

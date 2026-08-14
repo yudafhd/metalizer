@@ -30,6 +30,111 @@ Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memva
 - Rust `image` untuk contact sheet
 - Rust `csv` untuk CSV yang aman terhadap koma dan tanda kutip
 
+## Lisensi aplikasi
+
+Metalizer memakai [`guardian-core`](https://github.com/yudafhd/guardian-core) untuk aktivasi lisensi berbasis email. Kode lisensi diverifikasi di Rust, terikat ke perangkat, dan status masa aktif dapat dicek tanpa koneksi internet.
+
+### Membuat key dan kode lisensi
+
+Semua langkah berikut dijalankan dari folder project Metalizer. `guardian-core` hanya digunakan sebagai tool penerbit lisensi dan tidak perlu dipindahkan ke dalam project ini.
+
+1. Masuk ke folder project:
+
+```bash
+cd /path/ke/metalizer
+```
+
+Windows PowerShell:
+
+```powershell
+cd D:\Work\Projects\metalizer
+```
+
+2. Clone `guardian-core` ke folder sebelah project jika belum ada:
+
+```bash
+if [ ! -f ../guardian-core/Cargo.toml ]; then
+  git clone https://github.com/yudafhd/guardian-core.git ../guardian-core
+fi
+```
+
+Di Windows PowerShell, gunakan:
+
+```powershell
+if (-not (Test-Path "..\guardian-core\Cargo.toml")) {
+  git clone https://github.com/yudafhd/guardian-core.git ..\guardian-core
+}
+```
+
+3. Buat folder key di luar project Metalizer, lalu buat keypair:
+
+Linux/macOS:
+
+```bash
+mkdir -p ../metalizer-license-keys
+cargo run --manifest-path ../guardian-core/Cargo.toml --bin licensectl -- keygen --out ../metalizer-license-keys
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force ..\metalizer-license-keys | Out-Null
+cargo run --manifest-path "..\guardian-core\Cargo.toml" --bin licensectl -- keygen --out "..\metalizer-license-keys"
+```
+
+Hasilnya adalah `private.key` dan `public.key`. Jangan commit atau membagikan `private.key`.
+
+4. Buat kode lisensi untuk pelanggan:
+
+```bash
+cargo run --manifest-path ../guardian-core/Cargo.toml --bin licensectl -- issue \
+  --private-key ../metalizer-license-keys/private.key \
+  --product metalizer \
+  --email customer@example.com \
+  --activation-days 2 \
+  --years 1
+```
+
+Windows PowerShell:
+
+```powershell
+cargo run --manifest-path "..\guardian-core\Cargo.toml" --bin licensectl -- issue `
+  --private-key "..\metalizer-license-keys\private.key" `
+  --product metalizer `
+  --email customer@example.com `
+  --activation-days 2 `
+  --years 1
+```
+
+Salin output yang diawali `SLC1.` kepada pelanggan. Email pada kode harus sama dengan email yang digunakan saat aktivasi.
+
+Untuk lisensi lifetime, ganti `--years 1` dengan `--perpetual`.
+
+5. Set public key sebelum membuat build aplikasi.
+
+Linux/macOS:
+
+```bash
+export LICENSE_PUBLIC_KEY="$(tr -d '\r\n' < ../metalizer-license-keys/public.key)"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:LICENSE_PUBLIC_KEY = (Get-Content "..\metalizer-license-keys\public.key" -Raw).Trim()
+```
+
+6. Build Metalizer dari folder project:
+
+```bash
+npm install
+npm run tauri build
+```
+
+Environment variable tersebut harus tetap tersedia pada terminal yang menjalankan build. Hanya `public.key` yang boleh di-embed ke aplikasi; `private.key` hanya digunakan operator saat menerbitkan kode lisensi.
+
+Product ID harus tetap `metalizer`, sesuai konfigurasi aplikasi.
+
 ## Prasyarat pengembangan
 
 Pasang hal berikut sebelum menjalankan proyek:

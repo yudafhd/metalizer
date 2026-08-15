@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CloudOff, Download, FileWarning, LoaderCircle } from "lucide-react";
+import { AlertTriangle, Circle, CloudOff, Download, FileWarning, LoaderCircle } from "lucide-react";
 
 import { NoticeStack } from "./components/common/NoticeStack";
 import { GuideModal } from "./components/common/GuideModal";
@@ -9,6 +9,7 @@ import { Inspector } from "./components/metadata/Inspector";
 import { MetadataTable } from "./components/metadata/MetadataTable";
 import { TopBar } from "./components/layout/TopBar";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
+import { ThemeSheet } from "./components/settings/ThemeSheet";
 import { useAppStore } from "./stores/appStore";
 import { cancelActiveGeneration, runGeneration } from "./services/generation";
 import { activateLicense, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
@@ -33,6 +34,7 @@ export default function App() {
   const notices = useAppStore((state) => state.notices);
   const { addAssets, removeAsset, clearCompleted, clearAll, patchAsset, setSettings, setSelectedAssetId, toggleSelectedAsset, selectAll, clearSelection, setApiKeyConfigured, setApiKeyVerified, setDailyUsage, addNotice, dismissNotice, setAssetStatus } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [offline, setOffline] = useState(!navigator.onLine);
@@ -46,7 +48,7 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setShowSplash(false), 3_000);
+    const timeout = window.setTimeout(() => setShowSplash(false), 2_500);
     return () => window.clearTimeout(timeout);
   }, []);
 
@@ -80,6 +82,13 @@ export default function App() {
   useEffect(() => { void getLicenseStatus().then(setLicenseStatus).catch((error) => setLicenseError(error instanceof Error ? error.message : String(error))).finally(() => setLicenseBusy(false)); }, []);
 
   useEffect(() => { if (settingsHydrated) void writeSettings(settings); }, [settings, settingsHydrated]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+    const themeColor = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim().split(/\s+/).map(Number);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta && themeColor.length === 3 && themeColor.every(Number.isFinite)) themeMeta.setAttribute("content", `rgb(${themeColor.join(", ")})`);
+  }, [settings.theme]);
 
   useEffect(() => {
     const refreshDailyUsage = () => { void readDailyUsage().then(setDailyUsage); };
@@ -123,7 +132,7 @@ export default function App() {
       if (!folder) return;
       const result = await scanFolder(folder);
       if (!result.paths.length) {
-        addNotice("warning", "Folder ini belum berisi gambar JPG, PNG, atau WebP yang bisa dipakai.");
+        addNotice("warning", "Folder ini belum berisi gambar JPG, PNG, WebP, atau SVG yang bisa dipakai.");
         return;
       }
       await addPaths(result.paths);
@@ -214,34 +223,223 @@ export default function App() {
   if (showSplash) return <SplashScreen />;
   if (!licenseStatus?.valid) return <LicenseGate status={licenseStatus} busy={licenseBusy} error={licenseError} onActivate={handleActivateLicense} />;
 
-  return <div className="flex h-screen flex-col overflow-hidden bg-surface-muted" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
-    <TopBar
-      assetCount={assets.length}
-      canGenerate={assets.length > 0 && apiKeyVerified && !offline}
-      isGenerating={isGenerating}
-      onGenerate={handleGenerate}
-      onCancel={handleCancel}
-      onOpenSettings={() => setSettingsOpen(true)}
-      onOpenGuide={() => setGuideOpen(true)}
-      metadataMode={settings.metadataMode}
-      onModeChange={(metadataMode: MetadataMode) => setSettings({ ...settings, metadataMode })}
-      onExport={startExport}
-      canExport={assets.length > 0}
-    />
-    {!apiKeyConfigured ? <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-950"><AlertTriangle size={14} /><span><b>Gemini API key belum ada.</b> Atur dulu di Settings sebelum Generate.</span><button className="font-bold underline decoration-amber-400 underline-offset-2" onClick={() => setSettingsOpen(true)}>Atur sekarang</button></div> : !apiKeyVerified ? <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-950"><AlertTriangle size={14} /><span><b>Koneksi Gemini belum dicek.</b> Tes API key yang tersimpan di Settings sebelum Generate.</span><button className="font-bold underline decoration-amber-400 underline-offset-2" onClick={() => setSettingsOpen(true)}>Buka Settings</button></div> : offline ? <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-raspberry-100 bg-raspberry-50 text-[11px] font-medium text-raspberry-800"><CloudOff size={14} /><span>Offline — metadata yang ada tetap bisa diedit dan di-export; Generate AI ditunda.</span></div> : null}
-    {isGenerating ? <ProgressBar progress={progress} jobs={jobs.length} /> : null}
-    <main className="flex min-h-0 flex-1 gap-4 bg-surface-muted p-4"><MetadataTable assets={assets} selectedAssetId={selectedAssetId} selectedAssetIds={selectedAssetIds} isGenerating={isGenerating} isAddingAssets={isAddingAssets} onSelect={setSelectedAssetId} onToggle={toggleSelectedAsset} onRemove={removeAsset} onClearCompleted={clearCompleted} onClearAll={clearAll} onRetryFailed={() => { void runGeneration({ onlyFailed: true }); }} onDrop={handleDrop} onChoose={addImages} onAddFolder={addFolder} onSelectAll={() => selectedAssetIds.length === assets.length ? clearSelection() : selectAll()} onSetCategory={bulkSetCategory} onAddKeyword={bulkAddKeyword} onRemoveKeyword={bulkRemoveKeyword} onRegenerate={bulkRegenerate} /><Inspector asset={selectedAsset} mode={settings.metadataMode} onClose={() => setSelectedAssetId(undefined)} onUpdate={updateMetadata} onRegenerate={regenerate} onUndo={undoRegenerate} /></main>
-    <footer className="flex h-[42px] shrink-0 items-center justify-between border-t border-raspberry-100 bg-surface px-6 text-[11px] font-semibold text-slate-500"><div className="flex items-center gap-4"><span><b className="font-extrabold text-slate-900">{assets.length}</b> aset</span><span><b className="font-extrabold text-emerald-600">{counts.complete}</b> selesai</span><span><b className="font-extrabold text-raspberry-600">{counts.processing}</b> diproses</span><span><b className="font-extrabold text-slate-700">{counts.queued}</b> antre</span>{counts.failed ? <span><b className="font-extrabold text-amber-600">{counts.failed}</b> gagal</span> : null}</div><span className="hidden lg:inline">Hari ini: <b className="text-raspberry-700">{dailyUsage.requests} request</b> · {formatTokenCount(dailyUsage.totalTokens)} token</span></footer>
-    <input ref={fileInput} type="file" className="hidden" multiple accept=".jpg,.jpeg,.png,.webp" onChange={(event) => { const paths = Array.from(event.target.files ?? []).map((file) => (file as File & { path?: string }).path).filter((path): path is string => Boolean(path)); setIsAddingAssets(true); void addPaths(paths).finally(() => setIsAddingAssets(false)); event.target.value = ""; }} />
-    {settingsOpen ? <SettingsPanel settings={settings} apiKeyConfigured={apiKeyConfigured} apiKeyVerified={apiKeyVerified} dailyUsage={dailyUsage} offline={offline} onSettingsChange={setSettings} onSaveApiKey={saveKey} onDeleteApiKey={removeKey} onTestApiKey={testKey} onClose={() => setSettingsOpen(false)} /> : null}
-    {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
-    {exportIssues ? <ExportReviewDialog issues={exportIssues} exporting={exporting} onCancel={() => setExportIssues(null)} onExport={() => void performExport()} /> : null}
-    <NoticeStack notices={notices} onDismiss={dismissNotice} />
-  </div>;
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-surface-muted" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
+      <TopBar
+        assetCount={assets.length}
+        canGenerate={assets.length > 0 && apiKeyVerified && !offline}
+        isGenerating={isGenerating}
+        onGenerate={handleGenerate}
+        onCancel={handleCancel}
+        onOpenThemePicker={() => setThemeSheetOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenGuide={() => setGuideOpen(true)}
+        metadataMode={settings.metadataMode}
+        onModeChange={(metadataMode: MetadataMode) => setSettings({ ...settings, metadataMode })}
+        onExport={startExport}
+        canExport={assets.length > 0}
+      />
+      {!apiKeyConfigured ? (
+        <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-amber-500/20 bg-amber-500/10 text-[11px] font-semibold text-ink">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <span>
+            <b className="font-extrabold text-amber-500">Gemini API key belum ada.</b> Atur dulu di Pengaturan sebelum Generate.
+          </span>
+          <button
+            className="font-extrabold text-accent-600 underline decoration-accent-500/50 underline-offset-2 hover:text-accent-500 transition-colors"
+            onClick={() => setSettingsOpen(true)}
+          >
+            Atur sekarang
+          </button>
+        </div>
+      ) : !apiKeyVerified ? (
+        <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-amber-500/20 bg-amber-500/10 text-[11px] font-semibold text-ink">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <span>
+            <b className="font-extrabold text-amber-500">Koneksi Gemini belum dicek.</b> Tes API key yang tersimpan di Pengaturan sebelum Generate.
+          </span>
+          <button
+            className="font-extrabold text-accent-600 underline decoration-accent-500/50 underline-offset-2 hover:text-accent-500 transition-colors"
+            onClick={() => setSettingsOpen(true)}
+          >
+            Buka Pengaturan
+          </button>
+        </div>
+      ) : offline ? (
+        <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-accent-500/20 bg-accent-500/10 text-[11px] font-medium text-ink">
+          <CloudOff size={14} className="text-accent-500 shrink-0" />
+          <span>Offline — metadata yang ada tetap bisa diedit dan di-export; Generate AI ditunda.</span>
+        </div>
+      ) : null}
+
+      {isGenerating ? <ProgressBar progress={progress} jobs={jobs.length} /> : null}
+
+      <main className="flex min-h-0 flex-1 gap-4 bg-surface-muted p-4">
+        <MetadataTable
+          assets={assets}
+          selectedAssetId={selectedAssetId}
+          selectedAssetIds={selectedAssetIds}
+          isGenerating={isGenerating}
+          isAddingAssets={isAddingAssets}
+          additionalPrompt={settings.additionalPrompt}
+          onAdditionalPromptChange={(additionalPrompt) => setSettings({ ...settings, additionalPrompt })}
+          onSelect={setSelectedAssetId}
+          onToggle={toggleSelectedAsset}
+          onRemove={removeAsset}
+          onClearCompleted={clearCompleted}
+          onClearAll={clearAll}
+          onRetryFailed={() => { void runGeneration({ onlyFailed: true }); }}
+          onDrop={handleDrop}
+          onChoose={addImages}
+          onAddFolder={addFolder}
+          onSelectAll={() => selectedAssetIds.length === assets.length ? clearSelection() : selectAll()}
+          onSetCategory={bulkSetCategory}
+          onAddKeyword={bulkAddKeyword}
+          onRemoveKeyword={bulkRemoveKeyword}
+          onRegenerate={bulkRegenerate}
+        />
+        {selectedAsset ? (
+          <Inspector
+            asset={selectedAsset}
+            mode={settings.metadataMode}
+            onClose={() => setSelectedAssetId(undefined)}
+            onUpdate={updateMetadata}
+            onRegenerate={regenerate}
+            onUndo={undoRegenerate}
+          />
+        ) : null}
+      </main>
+
+      <footer className="flex h-[40px] shrink-0 items-center justify-between border-t border-line bg-surface px-6 text-[11px] font-semibold text-ink-muted">
+        <div className="flex items-center gap-4">
+          <span><b className="font-extrabold text-ink">{assets.length}</b> aset</span>
+          <span><b className="font-extrabold text-emerald-600">{counts.complete}</b> selesai</span>
+          <span><b className="font-extrabold text-accent-600">{counts.processing}</b> diproses</span>
+          <span><b className="font-extrabold text-ink-secondary">{counts.queued}</b> antre</span>
+          {counts.failed ? <span><b className="font-extrabold text-amber-600">{counts.failed}</b> gagal</span> : null}
+        </div>
+        <span className="hidden lg:inline">
+          Hari ini: <b className="text-accent-700">{dailyUsage.requests} request</b> · {formatTokenCount(dailyUsage.totalTokens)} token
+        </span>
+      </footer>
+
+      <input
+        ref={fileInput}
+        type="file"
+        className="hidden"
+        multiple
+        accept=".jpg,.jpeg,.png,.webp,.svg"
+        onChange={(event) => {
+          const paths = Array.from(event.target.files ?? []).map((file) => (file as File & { path?: string }).path).filter((path): path is string => Boolean(path));
+          setIsAddingAssets(true);
+          void addPaths(paths).finally(() => setIsAddingAssets(false));
+          event.target.value = "";
+        }}
+      />
+      {themeSheetOpen ? (
+        <ThemeSheet
+          currentTheme={settings.theme}
+          onSelectTheme={(theme) => setSettings({ ...settings, theme })}
+          onClose={() => setThemeSheetOpen(false)}
+        />
+      ) : null}
+      {settingsOpen ? (
+        <SettingsPanel
+          settings={settings}
+          apiKeyConfigured={apiKeyConfigured}
+          apiKeyVerified={apiKeyVerified}
+          dailyUsage={dailyUsage}
+          offline={offline}
+          onSettingsChange={setSettings}
+          onSaveApiKey={saveKey}
+          onDeleteApiKey={removeKey}
+          onTestApiKey={testKey}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
+      {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
+      {exportIssues ? (
+        <ExportReviewDialog
+          issues={exportIssues}
+          exporting={exporting}
+          onCancel={() => setExportIssues(null)}
+          onExport={() => void performExport()}
+        />
+      ) : null}
+      <NoticeStack notices={notices} onDismiss={dismissNotice} />
+    </div>
+  );
 }
 
-function ProgressBar({ progress, jobs }: { progress: { total: number; completed: number; processing: number; queuedBatches: number; currentBatch?: string }; jobs: number }) { const percent = progress.total ? Math.min(100, Math.round((progress.completed / progress.total) * 100)) : 0; return <div className="flex h-[48px] shrink-0 items-center gap-4 border-b border-raspberry-100 bg-raspberry-50 px-6"><LoaderCircle size={15} className="animate-spin text-raspberry-600" /><div className="w-[220px]"><div className="flex justify-between text-[10px] font-extrabold text-slate-900"><span>Generate metadata</span><span>{progress.completed}/{progress.total}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-raspberry-200"><div className="h-full rounded-full bg-raspberry-600 transition-all" style={{ width: `${percent}%` }} /></div></div><span className="text-[10px] font-semibold text-slate-500">Batch {progress.currentBatch ?? "—"} · {progress.processing} sedang diproses · {progress.queuedBatches}/{jobs} antrean aktif</span><span className="ml-auto text-[10px] font-extrabold text-raspberry-700">{percent}%</span></div>; }
+function ProgressBar({ progress, jobs }: { progress: { total: number; completed: number; processing: number; queuedBatches: number; currentBatch?: string }; jobs: number }) {
+  const percent = progress.total ? Math.min(100, Math.round((progress.completed / progress.total) * 100)) : 0;
+  return (
+    <div className="flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-accent-50/70 px-6">
+      <LoaderCircle size={15} className="animate-spin text-accent-600" />
+      <div className="w-[220px]">
+        <div className="flex justify-between text-[10px] font-extrabold text-ink">
+          <span>Generate metadata</span>
+          <span>{progress.completed}/{progress.total}</span>
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-accent-200">
+          <div className="h-full rounded-full bg-accent-600 transition-all" style={{ width: `${percent}%` }} />
+        </div>
+      </div>
+      <span className="text-[10px] font-semibold text-ink-muted">
+        Batch {progress.currentBatch ?? "—"} · {progress.processing} sedang diproses · {progress.queuedBatches}/{jobs} antrean aktif
+      </span>
+      <span className="ml-auto text-[10px] font-extrabold text-accent-700">{percent}%</span>
+    </div>
+  );
+}
 
-function ExportReviewDialog({ issues, exporting, onCancel, onExport }: { issues: string[]; exporting: boolean; onCancel: () => void; onExport: () => void }) { return <div className="fixed inset-0 z-40 flex items-center justify-center bg-raspberry-900/25 backdrop-blur-sm"><div className="w-[490px] rounded-2xl border border-raspberry-100 bg-surface p-6 shadow-2xl"><div className="flex items-start gap-3.5"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700"><FileWarning size={20} /></div><div><h2 className="text-[16px] font-bold text-slate-900">Beberapa aset perlu dicek</h2><p className="mt-1 text-[12px] leading-5 text-slate-600">Ada masalah penting yang bisa membuat baris CSV kurang lengkap. Perbaiki dulu, atau tetap export metadata yang sudah ada.</p></div></div><div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-raspberry-100 bg-raspberry-50/50 p-3.5">{issues.slice(0, 12).map((issue) => <p key={issue} className="mb-1.5 text-[11px] leading-5 text-slate-800">• {issue}</p>)}{issues.length > 12 ? <p className="text-[11px] font-medium text-slate-500">+ {issues.length - 12} lainnya</p> : null}</div><div className="mt-5 flex justify-end gap-2.5"><button className="app-button" onClick={onCancel}>Cek dulu</button><button className="app-button app-button-primary" disabled={exporting} onClick={onExport}>{exporting ? <LoaderCircle size={14} className="animate-spin" /> : <Download size={14} />} Tetap export</button></div></div></div>; }
+function ExportReviewDialog({ issues, exporting, onCancel, onExport }: { issues: string[]; exporting: boolean; onCancel: () => void; onExport: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/35 backdrop-blur-sm">
+      <div className="w-[490px] rounded-2xl border border-line bg-surface p-6 shadow-modal">
+        <div className="flex items-start gap-3.5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 shrink-0">
+            <FileWarning size={20} />
+          </div>
 
-function downloadCsv(rows: { filename: string; title: string; keywords: string[]; category: number; releases?: string }[], includeReleases: boolean) { const csv = serializeAdobeCsv(rows, includeReleases); const blob = new Blob([csv], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "adobe-stock-metadata.csv"; anchor.click(); URL.revokeObjectURL(url); }
+          <div>
+            <h2 className="text-[16px] font-extrabold text-ink">Beberapa aset perlu dicek</h2>
+            <p className="mt-1 text-[12px] leading-5 text-ink-secondary">
+              Ada masalah yang bisa membuat baris CSV kurang lengkap. Perbaiki dulu, atau tetap export metadata yang sudah siap.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-line bg-surface-sunken p-3.5">
+          {issues.slice(0, 12).map((issue) => (
+            <p key={issue} className="mb-1.5 flex items-start gap-1.5 text-[11px] leading-5 text-ink">
+              <Circle size={6} fill="currentColor" className="mt-1.5 shrink-0 text-accent-600" />
+              {issue}
+            </p>
+          ))}
+          {issues.length > 12 ? (
+            <p className="text-[11px] font-medium text-ink-muted">+ {issues.length - 12} lainnya</p>
+          ) : null}
+        </div>
+        <div className="mt-5 flex justify-end gap-2.5">
+          <button className="app-button" onClick={onCancel}>
+            Cek dulu
+          </button>
+          <button className="app-button app-button-primary" disabled={exporting} onClick={onExport}>
+            {exporting ? <LoaderCircle size={14} className="animate-spin" /> : <Download size={14} />} Tetap export
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function downloadCsv(rows: { filename: string; title: string; keywords: string[]; category: number; releases?: string }[], includeReleases: boolean) {
+  const csv = serializeAdobeCsv(rows, includeReleases);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "adobe-stock-metadata.csv";
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

@@ -1,6 +1,8 @@
-import { BookOpen, Check, ChevronDown, Download, Settings2, Sparkles, Square } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Download, Palette, Settings2, Sparkles, Square } from "lucide-react";
 import { useState } from "react";
 import type { MetadataMode } from "../../types";
+import { openUrl } from "../../services/tauri";
+
 
 interface TopBarProps {
   assetCount: number;
@@ -8,6 +10,7 @@ interface TopBarProps {
   isGenerating: boolean;
   onGenerate: () => void;
   onCancel: () => void;
+  onOpenThemePicker: () => void;
   onOpenSettings: () => void;
   onOpenGuide: () => void;
   metadataMode: MetadataMode;
@@ -22,6 +25,7 @@ export function TopBar({
   isGenerating,
   onGenerate,
   onCancel,
+  onOpenThemePicker,
   onOpenSettings,
   onOpenGuide,
   metadataMode,
@@ -38,31 +42,81 @@ export function TopBar({
   const selectedMode = modeOptions.find((option) => option.value === metadataMode) ?? modeOptions[1];
 
   return (
-    <header className="flex h-[86px] shrink-0 items-center justify-between border-b border-raspberry-100 bg-surface px-6 shadow-[0_8px_24px_-20px_rgba(194,24,91,0.55)]">
+    <header className="flex h-[82px] shrink-0 items-center justify-between border-b border-line bg-surface px-6 shadow-panel">
       <div className="flex min-w-0 items-center gap-3.5">
-        <img src="/metalizer-icon.png" alt="Metalizer" className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-raspberry" />
+        <img
+          src="/metalizer-icon.png"
+          alt="Metalizer"
+          className="h-10 w-10 shrink-0 rounded-2xl object-cover shadow-accent"
+        />
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-[16px] font-extrabold leading-tight text-slate-900">Metalizer</h1>
-            <span className="rounded-md border border-raspberry-200 bg-raspberry-50 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-raspberry-700">v0.1.0</span>
+            <h1 className="truncate text-[16px] font-extrabold leading-tight text-ink">Metalizer</h1>
+            <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-accent-700">
+              v0.2.0
+            </span>
+
           </div>
-          <p className="mt-1 text-[11px] font-bold tracking-[0.02em] text-raspberry-700">Microstock Metadata</p>
+          <button
+            type="button"
+            onClick={() => void openUrl("https://mahes.app")}
+            className="mt-0.5 block text-left text-[11px] font-bold tracking-[0.02em] text-accent-600 hover:text-accent-500 hover:underline transition-colors"
+          >
+            tools by mahes.app
+          </button>
         </div>
       </div>
+
+
+
       <div className="flex items-center gap-2">
         <div className="relative flex items-center">
           <span className="sr-only">Mode metadata</span>
-          <button type="button" className="app-select flex h-9 w-[210px] items-center justify-between gap-2 px-3 text-left text-[12px] font-bold text-slate-800" onClick={() => setModeMenuOpen((open) => !open)} aria-expanded={modeMenuOpen} aria-haspopup="listbox">
+          <button
+            type="button"
+            className="app-select flex h-9 w-[210px] items-center justify-between gap-2 px-3 text-left text-[12px] font-bold text-ink"
+            onClick={() => setModeMenuOpen((open) => !open)}
+            aria-expanded={modeMenuOpen}
+            aria-haspopup="listbox"
+          >
             <span className="truncate">{selectedMode.label}</span>
-            <ChevronDown className={`shrink-0 text-raspberry-500 transition ${modeMenuOpen ? "rotate-180" : ""}`} size={14} />
+            <ChevronDown className={`shrink-0 text-accent-500 transition-transform ${modeMenuOpen ? "rotate-180" : ""}`} size={14} />
           </button>
-          {modeMenuOpen ? <div className="absolute right-0 top-11 z-30 w-[290px] overflow-hidden rounded-xl border border-raspberry-100 bg-surface shadow-xl" role="listbox" aria-label="Pilihan mode metadata">
-            {modeOptions.map((option) => <button key={option.value} type="button" role="option" aria-selected={metadataMode === option.value} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-raspberry-50 ${metadataMode === option.value ? "bg-raspberry-50/70" : ""}`} onClick={() => { onModeChange(option.value); setModeMenuOpen(false); }}>
-              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${metadataMode === option.value ? "bg-raspberry-600 text-white" : "bg-slate-100 text-slate-400"}`}>{metadataMode === option.value ? <Check size={13} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>
-              <span className="min-w-0 flex-1"><span className="block text-[11px] font-extrabold text-slate-800">{option.label}</span><span className="mt-0.5 block text-[10px] leading-4 text-slate-500">{option.detail}</span></span>
-            </button>)}
-          </div> : null}
+          {modeMenuOpen ? (
+            <div
+              className="absolute right-0 top-11 z-30 w-[290px] overflow-hidden rounded-xl border border-line bg-surface shadow-modal"
+              role="listbox"
+              aria-label="Pilihan mode metadata"
+            >
+              {modeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={metadataMode === option.value}
+                  className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition hover:bg-accent-50 ${metadataMode === option.value ? "bg-accent-50/80" : ""
+                    }`}
+                  onClick={() => {
+                    onModeChange(option.value);
+                    setModeMenuOpen(false);
+                  }}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${metadataMode === option.value ? "bg-accent-600 text-white shadow-sm" : "bg-surface-sunken text-ink-faint"
+                      }`}
+                  >
+                    {metadataMode === option.value ? <Check size={13} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-extrabold text-ink">{option.label}</span>
+                    <span className="mt-0.5 block text-[10px] leading-4 text-ink-muted">{option.detail}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
+
         <button
           className="app-button"
           disabled={!canExport}
@@ -71,20 +125,52 @@ export function TopBar({
         >
           <Download size={14} /> Export CSV
         </button>
+
         {isGenerating ? (
-          <button className="app-button border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-400 hover:bg-amber-100" onClick={onCancel}>
-          <Square size={13} fill="currentColor" /> Batal
+          <button
+            className="app-button border-amber-500/40 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 active:scale-[0.98]"
+            onClick={onCancel}
+          >
+            <Square size={13} fill="currentColor" /> Batal
           </button>
+
         ) : (
-          <button className="app-button app-button-primary" disabled={!canGenerate} onClick={onGenerate} title={!assetCount ? "Tambah gambar dulu" : "Generate metadata"}>
-          <Sparkles size={14} fill="currentColor" /> Generate
+          <button
+            className="app-button app-button-primary"
+            disabled={!canGenerate}
+            onClick={onGenerate}
+            title={!assetCount ? "Tambah gambar dulu" : "Generate metadata"}
+          >
+            <Sparkles size={14} fill="currentColor" /> Generate
           </button>
         )}
-        <button className="app-button hidden lg:inline-flex" onClick={onOpenGuide} title="Buka panduan">
-          <BookOpen size={15} /> Panduan
+
+        {/* Theme Button placed to the left of the Guide button */}
+        <button
+          className="app-button app-button-quiet h-9 w-9 px-0"
+          onClick={onOpenThemePicker}
+          title="Pilih tema & warna tampilan"
+          aria-label="Pilih tema & warna tampilan"
+        >
+          <Palette size={17} />
         </button>
-        <button className="app-button app-button-quiet h-10 w-10 px-0" onClick={onOpenSettings} aria-label="Buka Settings" title="Settings">
-          <Settings2 size={18} />
+
+        <button
+          className="app-button app-button-quiet h-9 w-9 px-0 hidden lg:inline-flex"
+          onClick={onOpenGuide}
+          title="Buka panduan"
+          aria-label="Buka panduan"
+        >
+          <BookOpen size={17} />
+        </button>
+
+        <button
+          className="app-button app-button-quiet h-9 w-9 px-0"
+          onClick={onOpenSettings}
+          aria-label="Buka Settings"
+          title="Settings"
+        >
+          <Settings2 size={17} />
         </button>
       </div>
     </header>

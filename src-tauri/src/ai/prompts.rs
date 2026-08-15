@@ -32,13 +32,35 @@ pub fn system_prompt(mode: &str, target_keywords: u8, scope: &str) -> String {
     )
 }
 
-pub fn user_prompt(mapping: &[AssetMapping]) -> String {
+pub fn user_prompt(mapping: &[AssetMapping], additional_prompt: &str) -> String {
     let mut text = String::from(
         "Analyze the numbered panels in this contact sheet. The filename mapping below is application context only. Use panel IDs in the JSON response and do not output filenames.\n\nASSET MAPPING:\n",
     );
     for item in mapping {
         text.push_str(&format!("{} = {}\n", item.id, item.filename));
     }
+    if !additional_prompt.trim().is_empty() {
+        text.push_str("\nUSER-PROVIDED CONTEXT:\n");
+        text.push_str(additional_prompt.trim());
+        text.push_str("\nUse this as additional context for the supplied asset(s) when relevant. It may describe a theme, event, or intended subject, but do not add unrelated claims or contradict what is visible.\n");
+    }
     text.push_str("\nADOBE STOCK CATEGORY IDS:\n1 Animals; 2 Buildings and Architecture; 3 Business; 4 Drinks; 5 The Environment; 6 States of Mind; 7 Food; 8 Graphic Resources; 9 Hobbies and Leisure; 10 Industry; 11 Landscape; 12 Lifestyle; 13 People; 14 Plants and Flowers; 15 Culture and Religion; 16 Science; 17 Social Issues; 18 Sports; 19 Technology; 20 Transport; 21 Travel.\n\nReturn only the structured JSON object.");
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_context_is_added_only_when_provided() {
+        let mapping = vec![AssetMapping {
+            id: "01".to_string(),
+            filename: "marine-day.svg".to_string(),
+        }];
+        let prompt = user_prompt(&mapping, "This is Japanese Marine Day.");
+        assert!(prompt.contains("USER-PROVIDED CONTEXT:"));
+        assert!(prompt.contains("This is Japanese Marine Day."));
+        assert!(!user_prompt(&mapping, "  ").contains("USER-PROVIDED CONTEXT:"));
+    }
 }

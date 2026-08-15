@@ -1,36 +1,57 @@
 import type { Config } from "tailwindcss";
 
+const accentScale = {
+  50: "rgb(var(--accent-50) / <alpha-value>)",
+  100: "rgb(var(--accent-100) / <alpha-value>)",
+  200: "rgb(var(--accent-200) / <alpha-value>)",
+  300: "rgb(var(--accent-300) / <alpha-value>)",
+  400: "rgb(var(--accent-400) / <alpha-value>)",
+  500: "rgb(var(--accent-500) / <alpha-value>)",
+  600: "rgb(var(--accent-600) / <alpha-value>)",
+  700: "rgb(var(--accent-700) / <alpha-value>)",
+  800: "rgb(var(--accent-800) / <alpha-value>)",
+  900: "rgb(var(--accent-900) / <alpha-value>)",
+};
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: "#0f172a",
-        surface: "#eaf1f8",
-        "surface-muted": "#dbe5ef",
-        slatepanel: "#edf3fa",
-        line: "#bfd1e6",
-        accent: "#4f46e5",
-        "accent-dark": "#3730a3",
-        "accent-light": "#6366f1",
-        mint: "#059669",
-        raspberry: {
-          50: "#eaf2ff",
-          100: "#d7e7ff",
-          200: "#b9d5ff",
-          300: "#82b7ff",
-          400: "#4f8ff7",
-          500: "#2563eb",
-          600: "#1d4ed8",
-          700: "#1e40af",
-          800: "#1e3a8a",
-          900: "#0b1f4d",
+        ink: {
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          secondary: "rgb(var(--ink-secondary) / <alpha-value>)",
+          muted: "rgb(var(--ink-muted) / <alpha-value>)",
+          faint: "rgb(var(--ink-faint) / <alpha-value>)",
         },
+        surface: {
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          muted: "rgb(var(--surface-muted) / <alpha-value>)",
+          raised: "rgb(var(--surface-raised) / <alpha-value>)",
+          sunken: "rgb(var(--surface-sunken) / <alpha-value>)",
+        },
+        line: {
+          DEFAULT: "rgb(var(--line) / <alpha-value>)",
+          subtle: "rgb(var(--line-subtle) / <alpha-value>)",
+        },
+        accent: accentScale,
+        primary: accentScale,
+        raspberry: accentScale,
+        slatepanel: "rgb(var(--surface-sunken) / <alpha-value>)",
       },
       boxShadow: {
-        panel: "0 4px 16px -2px rgba(15, 23, 42, 0.06)",
-        glow: "0 0 16px rgba(79, 70, 229, 0.15)",
-        raspberry: "0 10px 24px -12px rgba(29, 78, 216, 0.45)",
+        panel: "var(--shadow-panel)",
+        glow: "var(--shadow-glow)",
+        accent: "var(--shadow-accent)",
+        modal: "var(--shadow-modal)",
+        raspberry: "var(--shadow-accent)",
+      },
+      borderRadius: {
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+        "2xl": "var(--radius-2xl)",
+        "3xl": "var(--radius-3xl)",
       },
     },
   },

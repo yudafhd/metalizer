@@ -55,7 +55,7 @@ impl GeminiMetadataProvider {
             "contents": [{
                 "role": "user",
                 "parts": [
-                    { "text": user_prompt(&request.mapping) },
+                    { "text": user_prompt(&request.mapping, &request.additional_prompt) },
                     { "inlineData": { "mimeType": "image/jpeg", "data": image_base64 } }
                 ]
             }],

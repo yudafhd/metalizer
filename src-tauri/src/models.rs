@@ -58,6 +58,8 @@ pub struct GenerateMetadataRequest {
     pub model: String,
     pub mode: String,
     pub target_keywords: u8,
+    #[serde(default)]
+    pub additional_prompt: String,
     #[serde(default = "default_generation_scope")]
     pub generation_scope: String,
 }

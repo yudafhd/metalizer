@@ -1,6 +1,30 @@
 export type AssetStatus = "queued" | "preparing" | "processing" | "completed" | "failed";
 export type MetadataMode = "strict" | "balanced" | "discovery";
 export type ContentSource = "standard" | "generative-ai";
+export type AppTheme =
+  | "ocean"
+  | "sage"
+  | "lavender"
+  | "sand"
+  | "rose"
+  | "eucalyptus"
+  | "clay"
+  | "graphite"
+  | "sky"
+  | "paper"
+  | "obsidian"
+  | "midnight"
+  | "nord"
+  | "forest"
+  | "espresso"
+  | "cyber"
+  | "aurora"
+  | "nebula"
+  | "prism"
+  | "solstice"
+  | "arcane";
+
+
 
 export interface MetadataWarning {
   code: string;
@@ -53,11 +77,12 @@ export interface AppSettings {
   concurrency: 1 | 2 | 3;
   metadataMode: MetadataMode;
   targetKeywords: number;
+  additionalPrompt: string;
   contactSheetQuality: number;
   maxSheetSize: number;
   background: "neutral" | "white" | "gray";
   includeReleases: boolean;
-  theme: "light" | "dark";
+  theme: AppTheme;
 }
 
 export interface GenerationProgress {
@@ -117,6 +142,7 @@ export interface GenerateMetadataRequest {
   model: string;
   mode: string;
   targetKeywords: number;
+  additionalPrompt: string;
   generationScope?: "full" | "title" | "keywords";
 }
 

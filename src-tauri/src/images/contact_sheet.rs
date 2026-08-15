@@ -5,6 +5,7 @@ use image::imageops::{overlay, resize, FilterType};
 use image::{DynamicImage, Rgba, RgbaImage};
 
 use crate::errors::{AppError, AppResult};
+use crate::images::preprocess::open_image;
 use crate::models::{ContactSheetRequest, ContactSheetResult};
 
 const GAP: u32 = 18;
@@ -34,7 +35,7 @@ pub fn create_contact_sheet(app_cache_dir: &Path, request: &ContactSheetRequest)
     let cell_width = (width - GAP * (columns + 1)) / columns;
 
     for (index, asset) in request.assets.iter().enumerate() {
-        let image = image::open(&asset.path).map_err(|error| {
+        let image = open_image(Path::new(&asset.path)).map_err(|error| {
             AppError::InvalidRequest(format!("Could not decode {}: {}", asset.filename, error))
         })?;
         let column = index as u32 % columns;

@@ -68,6 +68,7 @@ export function normalizeKeywords(raw: string[], filename: string, maximum = 49)
       lower.includes(".jpeg") ||
       lower.includes(".png") ||
       lower.includes(".webp") ||
+      lower.includes(".svg") ||
       isUnsafeKeyword(keyword)
     ) {
       continue;

@@ -109,6 +109,7 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
         model: settings.modelPreset === "custom" ? settings.customModel : settings.model,
         mode: settings.metadataMode,
         targetKeywords: settings.targetKeywords,
+        additionalPrompt: settings.additionalPrompt.trim(),
         generationScope: scope,
       });
       store.recordGeminiUsage(response.usage);

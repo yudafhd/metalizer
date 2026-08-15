@@ -2,12 +2,13 @@
 
 Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memvalidasi, dan mengekspor metadata gambar secara batch untuk Adobe Stock. Metalizer menggunakan Gemini untuk membuat saran `Title`, `Keywords`, dan `Category`; keputusan akhir dan pemeriksaan metadata tetap berada di tangan pengguna.
 
-> Versi saat ini: `0.1.0`
+> Versi saat ini: `0.2.0`
+
 
 ## Fitur
 
 - Impor banyak file atau seluruh folder secara rekursif.
-- Mendukung `JPG`, `JPEG`, `PNG`, dan `WebP`.
+- Mendukung `JPG`, `JPEG`, `PNG`, `WebP`, dan `SVG`.
 - Pemrosesan batch 1–6 gambar menggunakan contact sheet.
 - Tiga gaya pembuatan metadata: **Ketat**, **Seimbang**, dan **Eksplorasi**.
 - Pemeriksaan keyword: duplikat, keyword berisiko, urutan relevansi, dan jumlah keyword.
@@ -190,7 +191,7 @@ Pilih salah satu cara berikut:
 - Klik **Tambah folder** untuk memindai gambar dari sebuah folder secara rekursif.
 - Seret gambar ke area workspace.
 
-File yang didukung adalah `JPG`, `JPEG`, `PNG`, dan `WebP`. File duplikat, rusak, atau tidak didukung akan dilewati. Gambar asli hanya dibaca dan tidak diubah.
+File yang didukung adalah `JPG`, `JPEG`, `PNG`, `WebP`, dan `SVG`. File duplikat, rusak, atau tidak didukung akan dilewati. Gambar asli hanya dibaca dan tidak diubah. SVG dirender sementara untuk preview dan analisis AI; file asli tetap tidak diubah.
 
 ### 3. Atur opsi generate
 

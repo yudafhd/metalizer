@@ -20,6 +20,7 @@ pub fn normalize_keywords(raw: &[String], filename: &str, maximum: usize) -> Vec
             || lower.contains(".jpeg")
             || lower.contains(".png")
             || lower.contains(".webp")
+            || lower.contains(".svg")
             || is_unsafe_keyword(&lower)
             || !seen.insert(lower)
         {

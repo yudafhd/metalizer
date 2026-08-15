@@ -26,7 +26,7 @@ const guideSections: GuideSection[] = [
       { label: "Metadata mode", detail: "Strict membuat hasil lebih aman dan spesifik. Balanced memberi hasil yang seimbang. Discovery lebih terbuka untuk mencari kemungkinan kata kunci." },
       { label: "Generate", detail: "Memulai proses pembuatan metadata dengan Gemini. Tombol ini aktif jika ada gambar, internet, dan API key yang sudah diuji." },
       { label: "Export CSV", detail: "Menyimpan metadata yang sudah selesai ke file CSV. Gambar asli tidak diubah." },
-      { label: "Pengaturan", detail: "Membuka pengaturan API key, model AI, ukuran batch, dan pilihan pemrosesan gambar." },
+      { label: "Pengaturan", detail: "Membuka pengaturan API key, tema warna, model AI, ukuran batch, dan pilihan pemrosesan gambar." },
       { label: "Panduan", detail: "Membuka penjelasan ini kapan saja." },
     ],
   },
@@ -59,6 +59,7 @@ const guideSections: GuideSection[] = [
     title: "Settings dan koneksi Gemini",
     description: "Pengaturan yang mengatur cara AI bekerja.",
     items: [
+      { label: "Tema & Desain", detail: "Pilih tema warna yang sesuai dengan preferensi Anda. Seluruh elemen akan menyesuaikan palet warna secara otomatis." },
       { label: "Gemini API key", detail: "Kunci untuk menghubungkan Metalizer ke Gemini. Kunci disimpan secara aman di aplikasi desktop, bukan di file metadata." },
       { label: "Tes dan Simpan", detail: "Tes memeriksa apakah key dapat digunakan. Simpan menyimpan key dan langsung mengecek koneksi." },
       { label: "Model AI", detail: "Seimbang cocok untuk penggunaan umum. Cepat mengutamakan kecepatan. Model khusus hanya digunakan jika Anda tahu nama model yang tersedia." },
@@ -84,43 +85,55 @@ const guideSections: GuideSection[] = [
 export function GuideModal({ onClose }: { onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-5 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-ink/35 p-5 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="flex max-h-[min(88vh,820px)] w-[min(900px,calc(100vw-40px))] flex-col overflow-hidden rounded-2xl border border-raspberry-100 bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label="Panduan Metalizer">
-        <div className="flex shrink-0 items-center justify-between border-b border-raspberry-100 bg-surface px-6 py-5">
+      <section
+        className="flex max-h-[min(88vh,820px)] w-[min(900px,calc(100vw-40px))] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Panduan Metalizer"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-raspberry-50 text-raspberry-600"><BookOpen size={19} /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-50 text-accent-600">
+              <BookOpen size={19} />
+            </div>
             <div>
-              <p className="eyebrow">Metalizer v0.1.0</p>
-              <h2 className="mt-1 text-[17px] font-extrabold text-slate-900">Panduan penggunaan</h2>
+              <p className="eyebrow">Metalizer v0.2.0</p>
+
+              <h2 className="mt-0.5 text-[17px] font-extrabold text-ink">Panduan Penggunaan</h2>
             </div>
           </div>
-          <button className="app-button app-button-quiet h-8 w-8 px-0" onClick={onClose} aria-label="Tutup panduan"><X size={18} /></button>
+          <button className="app-button app-button-quiet h-8 w-8 px-0" onClick={onClose} aria-label="Tutup panduan">
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-raspberry-50/20 px-6 py-5">
-          <div className="rounded-2xl border border-raspberry-200 bg-raspberry-50/70 p-4">
+        <div className="min-h-0 overflow-y-auto bg-surface-sunken/30 px-6 py-5">
+          <div className="rounded-2xl border border-accent-200 bg-accent-50/80 p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <Info size={17} className="mt-0.5 shrink-0 text-raspberry-600" />
-              <p className="text-[12px] leading-5 text-slate-700">Metalizer membantu menyiapkan metadata microstock dari gambar. AI memberi saran awal, tetapi Anda tetap menjadi pemeriksa terakhir sebelum file dikirim ke Adobe Stock.</p>
+              <Info size={17} className="mt-0.5 shrink-0 text-accent-600" />
+              <p className="text-[12px] leading-5 text-ink-secondary">
+                Metalizer membantu menyiapkan metadata microstock dari gambar. AI memberi saran awal, tetapi Anda tetap menjadi pemeriksa terakhir sebelum file dikirim ke Adobe Stock.
+              </p>
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-3.5">
             {guideSections.map((section) => (
-              <article key={section.title} className="rounded-2xl border border-raspberry-100 bg-surface p-5 shadow-sm">
-                <h3 className="text-[14px] font-extrabold text-slate-900">{section.title}</h3>
-                <p className="mt-1 text-[11px] leading-5 text-slate-500">{section.description}</p>
-                <div className="mt-4 divide-y divide-raspberry-50">
+              <article key={section.title} className="rounded-2xl border border-line bg-surface p-5 shadow-panel">
+                <h3 className="text-[14px] font-extrabold text-ink">{section.title}</h3>
+                <p className="mt-0.5 text-[11px] leading-5 text-ink-muted">{section.description}</p>
+                <div className="mt-4 divide-y divide-line-subtle">
                   {section.items.map((item) => (
                     <div key={item.label} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-raspberry-500" />
+                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-accent-600" />
                       <div>
-                        <p className="text-[11px] font-extrabold text-slate-800">{item.label}</p>
-                        <p className="mt-1 text-[11px] leading-5 text-slate-600">{item.detail}</p>
+                        <p className="text-[11px] font-extrabold text-ink">{item.label}</p>
+                        <p className="mt-0.5 text-[11px] leading-5 text-ink-secondary">{item.detail}</p>
                       </div>
                     </div>
                   ))}
@@ -130,9 +143,11 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-raspberry-100 bg-surface px-6 py-3.5">
-          <p className="text-[10px] font-medium text-slate-500">Gunakan panduan ini kapan saja melalui tombol Panduan di header.</p>
-          <button className="app-button app-button-primary h-8 px-3 text-[11px]" onClick={onClose}>Mengerti</button>
+        <div className="flex shrink-0 items-center justify-between border-t border-line bg-surface px-6 py-3.5">
+          <p className="text-[10px] font-medium text-ink-muted">Gunakan panduan ini kapan saja melalui tombol Panduan di header.</p>
+          <button className="app-button app-button-primary h-8 px-4 text-[11px]" onClick={onClose}>
+            Mengerti
+          </button>
         </div>
       </section>
     </div>

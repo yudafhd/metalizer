@@ -25,7 +25,7 @@ export async function chooseImages(): Promise<string[]> {
   const selected = await open({
     multiple: true,
     directory: false,
-    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp"] }],
+    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "svg"] }],
   });
   if (!selected) return [];
   return Array.isArray(selected) ? selected : [selected];
@@ -101,4 +101,16 @@ export function exportCsvFile(request: CsvExportRequest): Promise<CsvExportResul
 
 export function cleanupTempFile(path: string): Promise<void> {
   return invokeCommand("cleanup_temp_file", { path });
+}
+
+export async function openUrl(url: string): Promise<void> {
+  if (isTauri) {
+    try {
+      await invokeCommand("open_url", { url });
+      return;
+    } catch {
+      // Fallback to browser window open
+    }
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 }

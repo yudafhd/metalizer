@@ -1,6 +1,6 @@
 [package]
 name = "adobe-stock-metadata-generator"
-version = "0.1.0"
+version = "0.2.0"
 description = "A local-first batch metadata generator for Adobe Stock contributors"
 authors = ["Yuda Fhd"]
 edition = "2021"
@@ -25,6 +25,7 @@ serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+resvg = "0.45"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 base64 = "0.22"

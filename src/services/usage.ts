@@ -44,7 +44,15 @@ export async function writeDailyUsage(usage: DailyUsage): Promise<void> {
   await preferencesStore.save();
 }
 
-export function usageToDailyDelta(usage: GeminiUsageMetadata): Omit<DailyUsage, "date"> {
+export function usageToDailyDelta(usage?: GeminiUsageMetadata | null): Omit<DailyUsage, "date"> {
+  if (!usage) {
+    return {
+      requests: 1,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+  }
   return {
     requests: 1,
     promptTokens: Math.max(0, Number(usage.promptTokenCount) || 0),
@@ -52,6 +60,7 @@ export function usageToDailyDelta(usage: GeminiUsageMetadata): Omit<DailyUsage, 
     totalTokens: Math.max(0, Number(usage.totalTokenCount) || 0),
   };
 }
+
 
 export function formatTokenCount(value: number): string {
   if (value < 1_000) return String(value);

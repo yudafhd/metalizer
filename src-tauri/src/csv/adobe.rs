@@ -23,7 +23,14 @@ pub fn export_csv(request: &CsvExportRequest) -> AppResult<CsvExportResult> {
 
     for row in &request.rows {
         if chunk.len() >= MAX_ROWS {
-            write_chunk(&base_path, &mut files, &chunk, request.include_releases, chunk_number, true)?;
+            write_chunk(
+                &base_path,
+                &mut files,
+                &chunk,
+                request.include_releases,
+                chunk_number,
+                true,
+            )?;
             chunk.clear();
             chunk_number += 1;
         }
@@ -36,7 +43,14 @@ pub fn export_csv(request: &CsvExportRequest) -> AppResult<CsvExportResult> {
                     "Satu baris CSV melebihi batas export 1 MB".to_string(),
                 ));
             }
-            write_chunk(&base_path, &mut files, &chunk, request.include_releases, chunk_number, true)?;
+            write_chunk(
+                &base_path,
+                &mut files,
+                &chunk,
+                request.include_releases,
+                chunk_number,
+                true,
+            )?;
             chunk.clear();
             chunk_number += 1;
             chunk.push(last);
@@ -49,7 +63,14 @@ pub fn export_csv(request: &CsvExportRequest) -> AppResult<CsvExportResult> {
     }
     if !chunk.is_empty() {
         let split = !files.is_empty();
-        write_chunk(&base_path, &mut files, &chunk, request.include_releases, chunk_number, split)?;
+        write_chunk(
+            &base_path,
+            &mut files,
+            &chunk,
+            request.include_releases,
+            chunk_number,
+            split,
+        )?;
     }
     Ok(CsvExportResult {
         files,
@@ -71,10 +92,15 @@ fn write_chunk(
     Ok(())
 }
 
-fn render_chunk(rows: &[crate::models::CsvExportRow], include_releases: bool) -> AppResult<Vec<u8>> {
+fn render_chunk(
+    rows: &[crate::models::CsvExportRow],
+    include_releases: bool,
+) -> AppResult<Vec<u8>> {
     let mut bytes = Vec::new();
     {
-        let mut writer = WriterBuilder::new().has_headers(true).from_writer(&mut bytes);
+        let mut writer = WriterBuilder::new()
+            .has_headers(true)
+            .from_writer(&mut bytes);
         if include_releases {
             writer.write_record(["Filename", "Title", "Keywords", "Category", "Releases"])?;
             for row in rows {
@@ -114,6 +140,9 @@ fn output_path_for(base_path: &Path, number: usize, split: bool) -> PathBuf {
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("metadata");
-    let extension = base_path.extension().and_then(|value| value.to_str()).unwrap_or("csv");
+    let extension = base_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("csv");
     base_path.with_file_name(format!("{}_part_{:03}.{}", stem, number, extension))
 }

@@ -143,3 +143,143 @@ pub struct FolderImageResult {
     pub paths: Vec<String>,
     pub rejected_count: usize,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitialCandidate {
+    pub asset_id: String,
+    pub search_query: String,
+    pub search_terms: Vec<String>,
+    pub initial_title: String,
+    pub visual_facts: Vec<String>,
+    pub asset_type: Option<String>,
+    pub visual_style: Option<String>,
+    pub category: u8,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitialCandidateRequest {
+    pub asset_id: String,
+    pub image_path: String,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdobePopulationSearchRequest {
+    pub asset_id: String,
+    pub query: String,
+    pub locale: String,
+    pub asset_type: String,
+    pub sort: String,
+    pub limit: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AdobePopulationSearchResult {
+    pub rank: u8,
+    pub url: String,
+    pub asset_id: Option<String>,
+    pub search_title: Option<String>,
+    pub title: Option<String>,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    pub category: Option<u8>,
+    pub contributor: Option<String>,
+    pub asset_type: Option<String>,
+    pub creation_date: Option<String>,
+    pub thumbnail_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdobePopulationSearchResponse {
+    pub search_url: String,
+    pub query: String,
+    pub locale: String,
+    pub asset_type: String,
+    pub sort: String,
+    pub results: Vec<AdobePopulationSearchResult>,
+    pub total_found: usize,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationAnalysisRequest {
+    pub asset_id: String,
+    pub image_path: String,
+    pub model: String,
+    pub initial_candidate: InitialCandidate,
+    pub samples: Vec<AdobePopulationSample>,
+    pub asset_type: String,
+    pub sort: String,
+    pub locale: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationAnalysisResponse {
+    pub recommendation_title_from_population: String,
+    pub recommended_focus_keywords: Vec<String>,
+    pub attempts: u8,
+    pub usage: GeminiUsageMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdobePopulationSample {
+    pub sample_rank: u8,
+    pub url: String,
+    pub asset_id: Option<String>,
+    pub search_title: Option<String>,
+    pub title: Option<String>,
+    pub keywords: Vec<String>,
+    pub category: Option<u8>,
+    pub contributor: Option<String>,
+    pub asset_type: Option<String>,
+    pub creation_date: Option<String>,
+    pub creation_rank: Option<u8>,
+    pub freshness_score: Option<f32>,
+    pub estimated_month: Option<u8>,
+    pub estimated_year: Option<u16>,
+    pub date_source: Option<String>,
+    pub date_confidence: u8,
+    pub metadata_status: String,
+    pub extraction_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationRankingRequest {
+    pub samples: Vec<AdobePopulationSample>,
+    pub creation_results: Vec<AdobePopulationSearchResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationKeyword {
+    pub keyword: String,
+    pub normalized_keyword: String,
+    pub group: String,
+    pub frequency: usize,
+    pub sample_count: usize,
+    pub best_sample_rank: u8,
+    pub average_sample_rank: f32,
+    pub best_keyword_position: u8,
+    pub average_keyword_position: f32,
+    pub semantic_match: f32,
+    pub distinctiveness_adjustment: f32,
+    pub population_score: f32,
+    pub supported_by_input: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopulationAggregationRequest {
+    pub samples: Vec<AdobePopulationSample>,
+    pub visual_facts: Vec<String>,
+}

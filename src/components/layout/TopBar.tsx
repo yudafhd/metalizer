@@ -1,8 +1,9 @@
-import { BookOpen, Check, ChevronDown, Download, Palette, Settings2, Sparkles, Square } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Compass, Download, Layers, Palette, Settings2, Sparkles, Square } from "lucide-react";
 import { useState } from "react";
 import type { MetadataMode } from "../../types";
 import { openUrl } from "../../services/tauri";
 
+export type AppViewMode = "standard" | "staged";
 
 interface TopBarProps {
   assetCount: number;
@@ -17,6 +18,8 @@ interface TopBarProps {
   onModeChange: (mode: MetadataMode) => void;
   onExport: () => void;
   canExport: boolean;
+  activeView: AppViewMode;
+  onViewChange: (view: AppViewMode) => void;
 }
 
 export function TopBar({
@@ -32,6 +35,8 @@ export function TopBar({
   onModeChange,
   onExport,
   canExport,
+  activeView,
+  onViewChange,
 }: TopBarProps) {
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const modeOptions: Array<{ value: MetadataMode; label: string; detail: string }> = [
@@ -55,7 +60,6 @@ export function TopBar({
             <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-accent-700">
               v0.2.0
             </span>
-
           </div>
           <button
             type="button"
@@ -67,7 +71,34 @@ export function TopBar({
         </div>
       </div>
 
+      {/* TopBar Sliding View Mode Switcher */}
+      <div className="flex items-center rounded-2xl bg-surface-sunken p-1 border border-line-subtle shadow-inner">
+        <button
+          type="button"
+          onClick={() => onViewChange("standard")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-extrabold transition-all duration-200 ${
+            activeView === "standard"
+              ? "bg-surface text-ink shadow-sm border border-line"
+              : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          <Layers size={15} className={activeView === "standard" ? "text-accent-600" : ""} />
+          <span>Metadata</span>
+        </button>
 
+        <button
+          type="button"
+          onClick={() => onViewChange("staged")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-[12px] font-extrabold transition-all duration-200 ${
+            activeView === "staged"
+              ? "bg-accent-600 text-white shadow-md shadow-accent-600/20"
+              : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          <Compass size={15} className={activeView === "staged" ? "text-white" : "text-accent-600"} />
+          <span>Research (PRO)</span>
+        </button>
+      </div>
 
       <div className="flex items-center gap-2">
         <div className="relative flex items-center">

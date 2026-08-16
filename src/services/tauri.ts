@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
@@ -11,10 +12,20 @@ import type {
   GenerateMetadataRequest,
   MetadataGenerationResult,
   LicenseStatus,
+  PopulationSearchProgressPayload,
   ValidationResult,
 } from "../types";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
+
+export function onPopulationSearchProgress(
+  callback: (payload: PopulationSearchProgressPayload) => void
+): Promise<UnlistenFn> {
+  if (!isTauri) return Promise.resolve(() => {});
+  return listen<PopulationSearchProgressPayload>("population-search-progress", (event) => {
+    callback(event.payload);
+  });
+}
 
 export async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri) throw new Error("Aksi ini hanya tersedia di aplikasi desktop");

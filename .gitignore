@@ -5,3 +5,4 @@ src-tauri/gen/
 *.hold
 *.log
 .DS_Store
+licenses.html

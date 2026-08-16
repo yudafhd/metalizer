@@ -32,7 +32,10 @@ pub async fn generate_metadata(
         .insert(request.batch_id.clone(), cancellation.clone());
     let provider = GeminiMetadataProvider::new(api_key, cancellation);
     let provider_name = provider.provider_name();
-    let result = provider.generate_metadata(&request).await.map_err(command_error);
+    let result = provider
+        .generate_metadata(&request)
+        .await
+        .map_err(command_error);
     if result.is_ok() {
         tracing::info!(batch_id = %request.batch_id, provider = provider_name, "metadata batch completed");
     } else {
@@ -83,7 +86,10 @@ pub fn delete_api_key(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[command]
-pub async fn test_api_key(api_key: Option<String>, state: State<'_, AppState>) -> Result<ApiStatus, String> {
+pub async fn test_api_key(
+    api_key: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<ApiStatus, String> {
     let key = match api_key.filter(|value| !value.trim().is_empty()) {
         Some(value) => value,
         None => state
@@ -128,7 +134,10 @@ pub async fn test_api_key(api_key: Option<String>, state: State<'_, AppState>) -
         Ok(ApiStatus {
             connected: false,
             status: "failed".to_string(),
-            message: Some(format!("Koneksi Gemini gagal dengan HTTP {}", status.as_u16())),
+            message: Some(format!(
+                "Koneksi Gemini gagal dengan HTTP {}",
+                status.as_u16()
+            )),
         })
     }
 }

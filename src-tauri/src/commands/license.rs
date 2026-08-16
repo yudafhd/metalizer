@@ -13,8 +13,15 @@ fn manager(app: &AppHandle) -> Result<LicenseManager<JsonFileStore>, String> {
     if public_key.trim().is_empty() {
         return Err("Public key lisensi belum dikonfigurasi pada build aplikasi.".into());
     }
-    let path = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("license.json");
-    Ok(LicenseManager::new(LicenseConfig::new(PRODUCT_ID, DEVICE_NAMESPACE, public_key), JsonFileStore::new(path)))
+    let path = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("license.json");
+    Ok(LicenseManager::new(
+        LicenseConfig::new(PRODUCT_ID, DEVICE_NAMESPACE, public_key),
+        JsonFileStore::new(path),
+    ))
 }
 
 #[command]
@@ -23,7 +30,11 @@ pub fn license_status(app: AppHandle) -> Result<LicenseStatus, String> {
 }
 
 #[command]
-pub fn activate_license(app: AppHandle, license_code: String, email: String) -> Result<LicenseStatus, String> {
+pub fn activate_license(
+    app: AppHandle,
+    license_code: String,
+    email: String,
+) -> Result<LicenseStatus, String> {
     let email = email.trim();
     if email.is_empty() || !email.contains('@') {
         return Err("Masukkan email yang valid.".into());
@@ -31,9 +42,14 @@ pub fn activate_license(app: AppHandle, license_code: String, email: String) -> 
     if license_code.trim().is_empty() {
         return Err("Masukkan kode lisensi.".into());
     }
-    manager(&app)?.activate(license_code.trim(), email, Utc::now()).map_err(|e| e.to_string())
+    manager(&app)?
+        .activate(license_code.trim(), email, Utc::now())
+        .map_err(|e| e.to_string())
 }
 
 pub fn require_license(app: &AppHandle) -> Result<(), String> {
-    manager(app)?.require_valid(Utc::now()).map(|_| ()).map_err(|e| e.to_string())
+    manager(app)?
+        .require_valid(Utc::now())
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }

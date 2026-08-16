@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { GEMINI_MODELS } from "../constants/models";
-import type { AppSettings, AssetStatus, BatchJob, DailyUsage, GenerationProgress, GeminiUsageMetadata, StockAsset } from "../types";
+import type { AdobePopulationResearch, AppSettings, AssetStatus, BatchJob, DailyUsage, GenerationProgress, GeminiUsageMetadata, InitialCandidate, StockAsset } from "../types";
 import { emptyDailyUsage, todayKey, usageToDailyDelta } from "../services/usage";
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -38,6 +38,8 @@ interface AppStore {
   dailyUsage: DailyUsage;
   progress: GenerationProgress;
   notices: Notice[];
+  initialCandidates: Record<string, InitialCandidate>;
+  populationResearch: Record<string, AdobePopulationResearch>;
   setAssets: (assets: StockAsset[]) => void;
   addAssets: (assets: StockAsset[]) => void;
   removeAsset: (id: string) => void;
@@ -62,6 +64,9 @@ interface AppStore {
   patchProgress: (patch: Partial<GenerationProgress>) => void;
   addNotice: (tone: Notice["tone"], message: string) => void;
   dismissNotice: (id: string) => void;
+  setInitialCandidates: (candidates: Record<string, InitialCandidate>) => void;
+  setInitialCandidate: (candidate: InitialCandidate) => void;
+  setPopulationResearch: (research: AdobePopulationResearch) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -75,6 +80,8 @@ export const useAppStore = create<AppStore>((set) => ({
   dailyUsage: emptyDailyUsage(todayKey()),
   progress: { total: 0, completed: 0, processing: 0, queuedBatches: 0, cancelled: false },
   notices: [],
+  initialCandidates: {},
+  populationResearch: {},
 
   setAssets: (assets) => set({ assets }),
   addAssets: (incoming) =>
@@ -138,12 +145,22 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   setProgress: (progress) => set({ progress }),
   patchProgress: (patch) => set((state) => ({ progress: { ...state.progress, ...patch } })),
-  addNotice: (tone, message) =>
+  addNotice: (tone, message) => {
+    const id = `${Date.now()}-${Math.random()}`;
     set((state) => ({
-      notices: [...state.notices, { id: `${Date.now()}-${Math.random()}`, tone, message }],
-    })),
+      notices: [...state.notices, { id, tone, message }],
+    }));
+    window.setTimeout(() => {
+      set((state) => ({
+        notices: state.notices.filter((notice) => notice.id !== id),
+      }));
+    }, 2_000);
+  },
   dismissNotice: (id) =>
     set((state) => ({
       notices: state.notices.filter((notice) => notice.id !== id),
     })),
+  setInitialCandidates: (initialCandidates) => set({ initialCandidates }),
+  setInitialCandidate: (candidate) => set((state) => ({ initialCandidates: { ...state.initialCandidates, [candidate.assetId]: candidate } })),
+  setPopulationResearch: (research) => set((state) => ({ populationResearch: { ...state.populationResearch, [research.assetId]: research } })),
 }));

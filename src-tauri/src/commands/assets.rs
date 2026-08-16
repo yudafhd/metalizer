@@ -6,10 +6,10 @@ use tauri::{command, AppHandle, Manager};
 use uuid::Uuid;
 
 use crate::errors::{command_error, AppError, AppResult};
+use crate::images::contact_sheet::create_contact_sheet as build_contact_sheet;
 use crate::images::preprocess::{mime_type_for_path, preview_data_url, read_dimensions};
 use crate::models::{AssetDescriptor, FolderImageResult};
 use crate::models::{ContactSheetRequest, ContactSheetResult};
-use crate::images::contact_sheet::create_contact_sheet as build_contact_sheet;
 
 #[command]
 pub async fn inspect_assets(paths: Vec<String>) -> Result<Vec<AssetDescriptor>, String> {
@@ -36,8 +36,12 @@ fn scan_folder_sync(path: String) -> AppResult<FolderImageResult> {
     }
     let mut paths = Vec::new();
     collect_file_paths(&root, &mut paths)?;
-    let assets = inspect_paths(paths.iter().map(|path| path.to_string_lossy().into_owned()).collect())
-        ?;
+    let assets = inspect_paths(
+        paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect(),
+    )?;
     let valid_count = assets.len();
     Ok(FolderImageResult {
         paths: assets.into_iter().map(|asset| asset.path).collect(),
@@ -84,7 +88,10 @@ fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
         let Ok(preview_url) = preview_data_url(Path::new(&normalized)) else {
             continue;
         };
-        let Some(filename) = Path::new(&normalized).file_name().and_then(|value| value.to_str()) else {
+        let Some(filename) = Path::new(&normalized)
+            .file_name()
+            .and_then(|value| value.to_str())
+        else {
             continue;
         };
         assets.push(AssetDescriptor {

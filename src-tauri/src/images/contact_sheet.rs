@@ -11,7 +11,10 @@ use crate::models::{ContactSheetRequest, ContactSheetResult};
 const GAP: u32 = 18;
 const HEADER: u32 = 58;
 
-pub fn create_contact_sheet(app_cache_dir: &Path, request: &ContactSheetRequest) -> AppResult<ContactSheetResult> {
+pub fn create_contact_sheet(
+    app_cache_dir: &Path,
+    request: &ContactSheetRequest,
+) -> AppResult<ContactSheetResult> {
     let count = request.assets.len();
     if count == 0 || count > 6 {
         return Err(AppError::InvalidRequest(
@@ -44,13 +47,29 @@ pub fn create_contact_sheet(app_cache_dir: &Path, request: &ContactSheetRequest)
         let y = GAP + row * (HEADER + content_height + GAP);
 
         draw_rect(&mut canvas, x, y, cell_width, HEADER, border);
-        draw_rect(&mut canvas, x, y + HEADER, cell_width, content_height, border);
+        draw_rect(
+            &mut canvas,
+            x,
+            y + HEADER,
+            cell_width,
+            content_height,
+            border,
+        );
         draw_panel_id(&mut canvas, x + 18, y + 16, &asset.panel_id, ink);
 
-        let resized = contain_image(&image, cell_width.saturating_sub(20), content_height.saturating_sub(20));
+        let resized = contain_image(
+            &image,
+            cell_width.saturating_sub(20),
+            content_height.saturating_sub(20),
+        );
         let offset_x = x + (cell_width.saturating_sub(resized.width())) / 2;
         let offset_y = y + HEADER + (content_height.saturating_sub(resized.height())) / 2;
-        overlay(&mut canvas, &resized, i64::from(offset_x), i64::from(offset_y));
+        overlay(
+            &mut canvas,
+            &resized,
+            i64::from(offset_x),
+            i64::from(offset_y),
+        );
     }
 
     fs::create_dir_all(app_cache_dir)?;
@@ -90,7 +109,12 @@ fn contain_image(image: &DynamicImage, max_width: u32, max_height: u32) -> RgbaI
     let scale = width_ratio.min(height_ratio).min(1.0);
     let target_width = ((source_width as f32 * scale).round() as u32).max(1);
     let target_height = ((source_height as f32 * scale).round() as u32).max(1);
-    resize(&image.to_rgba8(), target_width, target_height, FilterType::Lanczos3)
+    resize(
+        &image.to_rgba8(),
+        target_width,
+        target_height,
+        FilterType::Lanczos3,
+    )
 }
 
 fn parse_background(background: &str) -> Rgba<u8> {
@@ -144,16 +168,36 @@ fn draw_panel_id(canvas: &mut RgbaImage, x: u32, y: u32, value: &str, color: Rgb
 
 fn digit_glyph(ch: char) -> Option<[u8; 7]> {
     match ch {
-        '0' => Some([0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110]),
-        '1' => Some([0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        '2' => Some([0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111]),
-        '3' => Some([0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110]),
-        '4' => Some([0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010]),
-        '5' => Some([0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110]),
-        '6' => Some([0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110]),
-        '7' => Some([0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000]),
-        '8' => Some([0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110]),
-        '9' => Some([0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b11100]),
+        '0' => Some([
+            0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110,
+        ]),
+        '1' => Some([
+            0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        '2' => Some([
+            0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111,
+        ]),
+        '3' => Some([
+            0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110,
+        ]),
+        '4' => Some([
+            0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
+        ]),
+        '5' => Some([
+            0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110,
+        ]),
+        '6' => Some([
+            0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '7' => Some([
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
+        ]),
+        '8' => Some([
+            0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '9' => Some([
+            0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b11100,
+        ]),
         _ => None,
     }
 }

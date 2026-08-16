@@ -7,7 +7,8 @@ import { SplashScreen } from "./components/common/SplashScreen";
 import { LicenseGate } from "./components/common/LicenseGate";
 import { Inspector } from "./components/metadata/Inspector";
 import { MetadataTable } from "./components/metadata/MetadataTable";
-import { TopBar } from "./components/layout/TopBar";
+import { StagedResearchPage } from "./components/metadata/StagedResearchPage";
+import { TopBar, type AppViewMode } from "./components/layout/TopBar";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { ThemeSheet } from "./components/settings/ThemeSheet";
 import { useAppStore } from "./stores/appStore";
@@ -15,10 +16,15 @@ import { cancelActiveGeneration, runGeneration } from "./services/generation";
 import { activateLicense, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
 import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
-import { formatTokenCount, readDailyUsage } from "./services/usage";
+import { aggregatePopulationKeywords, analyzeAdobePopulation, analyzeInitialCandidate, calculatePopulationRanking, cancelPopulationAnalysis, populationResearchForAsset, searchAdobePopulation } from "./services/population";
+import { loadPopulationState, saveInitialCandidate, savePopulationResearch } from "./services/populationStore";
+import { formatTokenCount, readDailyUsage, writeDailyUsage } from "./services/usage";
 import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata";
 import { serializeAdobeCsv } from "./utils/csv";
-import type { ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
+import type { AdobePopulationAssetType, AdobePopulationResearch, AdobePopulationSample, AdobePopulationSort, ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
+import { selectPopulationTitle, validatePopulationQuery } from "./utils/population";
+
+const MAX_POPULATION_KEYWORDS = 35;
 
 export default function App() {
   const assets = useAppStore((state) => state.assets);
@@ -32,7 +38,9 @@ export default function App() {
   const dailyUsage = useAppStore((state) => state.dailyUsage);
   const progress = useAppStore((state) => state.progress);
   const notices = useAppStore((state) => state.notices);
-  const { addAssets, removeAsset, clearCompleted, clearAll, patchAsset, setSettings, setSelectedAssetId, toggleSelectedAsset, selectAll, clearSelection, setApiKeyConfigured, setApiKeyVerified, setDailyUsage, addNotice, dismissNotice, setAssetStatus } = useAppStore();
+  const initialCandidates = useAppStore((state) => state.initialCandidates);
+  const populationResearch = useAppStore((state) => state.populationResearch);
+  const { addAssets, removeAsset, clearCompleted, clearAll, patchAsset, setSettings, setSelectedAssetId, toggleSelectedAsset, selectAll, clearSelection, setApiKeyConfigured, setApiKeyVerified, setDailyUsage, addNotice, dismissNotice, setAssetStatus, setInitialCandidates, setInitialCandidate, setPopulationResearch } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -42,6 +50,7 @@ export default function App() {
   const [isAddingAssets, setIsAddingAssets] = useState(false);
   const [exportIssues, setExportIssues] = useState<string[] | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [activeView, setActiveView] = useState<AppViewMode>("standard");
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>();
   const [licenseBusy, setLicenseBusy] = useState(true);
   const [licenseError, setLicenseError] = useState<string>();
@@ -79,6 +88,15 @@ export default function App() {
     return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
   }, []); // settings are intentionally loaded once at startup
 
+  useEffect(() => {
+    void loadPopulationState()
+      .then(({ initialCandidates: storedCandidates, research: storedResearch }) => {
+        setInitialCandidates(storedCandidates);
+        Object.values(storedResearch).forEach((research) => setPopulationResearch(research));
+      })
+      .catch(() => addNotice("warning", "Research tersimpan belum bisa dibaca."));
+  }, [addNotice, setInitialCandidates, setPopulationResearch]);
+
   useEffect(() => { void getLicenseStatus().then(setLicenseStatus).catch((error) => setLicenseError(error instanceof Error ? error.message : String(error))).finally(() => setLicenseBusy(false)); }, []);
 
   useEffect(() => { if (settingsHydrated) void writeSettings(settings); }, [settings, settingsHydrated]);
@@ -97,6 +115,8 @@ export default function App() {
   }, [setDailyUsage]);
 
   const selectedAsset = useMemo(() => assets.find((asset) => asset.id === selectedAssetId), [assets, selectedAssetId]);
+  const selectedInitialCandidate = selectedAssetId ? initialCandidates[selectedAssetId] : undefined;
+  const selectedPopulationResearch = selectedAssetId ? populationResearch[selectedAssetId] : undefined;
   const counts = useMemo(() => ({ complete: assets.filter((asset) => asset.status === "completed").length, processing: assets.filter((asset) => asset.status === "processing" || asset.status === "preparing").length, queued: assets.filter((asset) => asset.status === "queued").length, failed: assets.filter((asset) => asset.status === "failed").length }), [assets]);
 
   const addPaths = useCallback(async (paths: string[]) => {
@@ -159,6 +179,274 @@ export default function App() {
   const updateMetadata = (assetId: string, metadata: StockMetadata) => patchAsset(assetId, { metadata, status: "completed", error: undefined });
   const regenerate = (assetId: string, scope: "full" | "title" | "keywords") => { setAssetStatus(assetId, "queued"); setSelectedAssetId(assetId); void runGeneration({ assetIds: [assetId], scope }); };
   const undoRegenerate = (assetId: string) => { const asset = useAppStore.getState().assets.find((candidate) => candidate.id === assetId); if (asset?.previousMetadata) patchAsset(assetId, { metadata: asset.previousMetadata, previousMetadata: undefined, status: "completed", error: undefined }); };
+
+  const saveResearchState = (research: AdobePopulationResearch) => {
+    setPopulationResearch(research);
+    void savePopulationResearch(research).catch(() => addNotice("warning", "Research tersimpan lokal, tetapi belum bisa ditulis ke Store."));
+  };
+
+  const patchResearchState = (assetId: string, patch: Partial<AdobePopulationResearch>, candidate = useAppStore.getState().initialCandidates[assetId]) => {
+    const existing = useAppStore.getState().populationResearch[assetId] ?? (candidate ? populationResearchForAsset(assetId, candidate) : emptyPopulationResearch(assetId));
+    const next = { ...existing, ...patch };
+    saveResearchState(next);
+    return next;
+  };
+
+  const handleAnalyzeInitial = async () => {
+    const asset = selectedAssetId ? useAppStore.getState().assets.find((item) => item.id === selectedAssetId) : undefined;
+    if (!asset) return;
+    if (!apiKeyVerified || offline) { addNotice("warning", "Verifikasi API key dan koneksi internet diperlukan untuk analisis Research."); return; }
+    patchResearchState(asset.id, { status: "initializing", stale: false, warnings: [] });
+    try {
+      const candidate = await analyzeInitialCandidate({
+        assetId: asset.id,
+        imagePath: asset.path,
+        model: settings.modelPreset === "custom" ? settings.customModel : settings.model,
+      });
+      setInitialCandidate(candidate);
+      await saveInitialCandidate(candidate);
+      const currentMetadata = asset.metadata ?? emptyMetadata(asset, settings.metadataMode);
+      const title = candidate.initialTitle.trim();
+      const titleDraft = { ...currentMetadata, assetId: asset.id, title };
+      const titleValidation = validateMetadata(asset.filename, titleDraft);
+      updateMetadata(asset.id, {
+        ...titleDraft,
+        keywords: titleValidation.normalizedKeywords,
+        warnings: titleValidation.warnings,
+        qualityScore: qualityScore(
+          { ...titleDraft, keywords: titleValidation.normalizedKeywords },
+          titleValidation,
+        ),
+      });
+      const research = {
+        ...populationResearchForAsset(asset.id, candidate),
+        selectedTitleSource: "initial" as const,
+        selectedTitle: title,
+      };
+      setPopulationResearch(research);
+      await savePopulationResearch(research);
+      addNotice("success", `${asset.filename}: kandidat awal tersimpan dan judul utama otomatis diterapkan. Review query sebelum research Adobe.`);
+    } catch (error) {
+      patchResearchState(asset.id, { status: "failed", warnings: [populationWarning(error instanceof Error ? error.message : String(error), "initial-analysis")] });
+      addNotice("error", `Kandidat awal gagal: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleResearchPopulation = async () => {
+    const state = useAppStore.getState();
+    const asset = selectedAssetId ? state.assets.find((item) => item.id === selectedAssetId) : undefined;
+    const candidate = selectedAssetId ? state.initialCandidates[selectedAssetId] : undefined;
+    if (!asset || !candidate) return;
+    const existing = state.populationResearch[asset.id] ?? populationResearchForAsset(asset.id, candidate);
+    const query = existing.query?.trim() || candidate.searchQuery;
+    const locale = existing.locale?.trim() || "id";
+    const assetType = existing.assetType ?? "vector";
+    const sort = existing.sort ?? "relevance";
+    const sampleLimit = existing.sampleLimit ?? 1;
+    if (!validatePopulationQuery(query)) { addNotice("warning", "Search query harus berisi 1-3 kata Inggris."); return; }
+    if (offline) { addNotice("warning", "Koneksi internet diperlukan untuk mengambil sample Adobe Stock."); return; }
+    patchResearchState(asset.id, {
+      status: "searching",
+      stale: false,
+      query,
+      locale,
+      assetType,
+      sort,
+      sampleLimit,
+      samples: [],
+      creationResults: undefined,
+      keywordAggregation: [],
+      recommendationTitleFromPopulation: undefined,
+      recommendedFocusKeywords: undefined,
+      selectedTitleSource: null,
+      selectedTitle: undefined,
+      selectedKeywords: [],
+      warnings: [],
+    }, candidate);
+    try {
+      const request = { assetId: asset.id, query, locale, assetType, sort, limit: sampleLimit };
+      const relevance = await searchAdobePopulation(request);
+      const creation = await searchAdobePopulation({ ...request, sort: "creation" });
+      const rawSamples: AdobePopulationSample[] = relevance.results.map((result) => {
+        const hasKeywords = Boolean(result.keywords && result.keywords.length > 0);
+        return {
+          sampleRank: result.rank,
+          url: result.url,
+          assetId: result.assetId,
+          searchTitle: result.searchTitle,
+          title: result.title ?? result.searchTitle,
+          keywords: result.keywords ?? [],
+          category: result.category,
+          contributor: result.contributor,
+          assetType: result.assetType,
+          creationDate: result.creationDate,
+          dateConfidence: result.creationDate ? 100 : 0,
+          metadataStatus: hasKeywords ? ("extracted" as const) : ("unavailable" as const),
+        };
+      });
+      if (!rawSamples.length) {
+        throw new Error("Adobe Stock tidak mengembalikan sample untuk query ini.");
+      }
+      const samples = await calculatePopulationRanking(rawSamples, creation.results);
+      const warnings = [...relevance.warnings, ...creation.warnings].map((message, index) => populationWarning(message, `adobe-${index}`));
+      patchResearchState(asset.id, {
+        status: samples.length > 0 ? "extracted" : "review",
+        stale: false,
+        searchUrl: relevance.searchUrl,
+        samples,
+        creationResults: creation.results,
+        keywordAggregation: [],
+        recommendationTitleFromPopulation: undefined,
+        recommendedFocusKeywords: undefined,
+        selectedTitleSource: null,
+        selectedTitle: undefined,
+        selectedKeywords: [],
+        warnings,
+      }, candidate);
+      addNotice("success", `${asset.filename}: ${samples.length} sample Adobe Stock beserta metadata detail berhasil diambil!`);
+    } catch (error) {
+      patchResearchState(asset.id, { status: "failed", warnings: [populationWarning(error instanceof Error ? error.message : String(error), "population-search")] }, candidate);
+      addNotice("error", `Pencarian Adobe Stock gagal: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleAnalyzePopulation = async () => {
+    const state = useAppStore.getState();
+    const asset = selectedAssetId ? state.assets.find((item) => item.id === selectedAssetId) : undefined;
+    const candidate = selectedAssetId ? state.initialCandidates[selectedAssetId] : undefined;
+    if (!asset || !candidate) return;
+    const existing = state.populationResearch[asset.id] ?? populationResearchForAsset(asset.id, candidate);
+    if (!existing.samples.length) {
+      addNotice("warning", "Ambil hasil pencarian Adobe Stock terlebih dahulu.");
+      return;
+    }
+    if (!apiKeyVerified || offline) { addNotice("warning", "Verifikasi API key Gemini dan koneksi internet diperlukan untuk langkah berikutnya."); return; }
+    const query = existing.query?.trim() || candidate.searchQuery;
+    const locale = existing.locale?.trim() || "id";
+    const assetType = existing.assetType ?? "vector";
+    const sort = existing.sort ?? "relevance";
+    patchResearchState(asset.id, { status: "analyzing", stale: false }, candidate);
+    try {
+      const analysis = await analyzeAdobePopulation({
+        assetId: asset.id,
+        imagePath: asset.path,
+        model: settings.modelPreset === "custom" ? settings.customModel : settings.model,
+        initialCandidate: candidate,
+        samples: existing.samples,
+        assetType,
+        sort,
+        locale,
+      });
+      const rankedSamples = await calculatePopulationRanking(existing.samples, existing.creationResults ?? []);
+      const keywordAggregation = await aggregatePopulationKeywords(rankedSamples, candidate.visualFacts);
+      const automaticKeywords = keywordAggregation.slice(0, MAX_POPULATION_KEYWORDS);
+      const currentMetadata = asset.metadata ?? emptyMetadata(asset, settings.metadataMode);
+      const existingKeywordSet = new Set(
+        currentMetadata.keywords.map((keyword) => keyword.toLowerCase()),
+      );
+      const mergedKeywords = [
+        ...currentMetadata.keywords,
+        ...automaticKeywords
+          .map((keyword) => keyword.keyword)
+          .filter((keyword) => !existingKeywordSet.has(keyword.toLowerCase())),
+      ];
+      const keywordDraft = { ...currentMetadata, assetId: asset.id, keywords: mergedKeywords };
+      const keywordValidation = validateMetadata(
+        asset.filename,
+        keywordDraft,
+        MAX_POPULATION_KEYWORDS,
+      );
+      const automaticallyAppliedKeywords = keywordValidation.normalizedKeywords.filter(
+        (keyword) => !existingKeywordSet.has(keyword.toLowerCase()),
+      );
+      const automaticKeywordSet = new Set(
+        automaticKeywords.map((keyword) => keyword.normalizedKeyword),
+      );
+      const appliedPopulationKeywords = keywordValidation.normalizedKeywords
+        .filter((keyword) => automaticKeywordSet.has(keyword.toLowerCase()));
+      updateMetadata(asset.id, {
+        ...keywordDraft,
+        keywords: keywordValidation.normalizedKeywords,
+        warnings: keywordValidation.warnings,
+        qualityScore: qualityScore(
+          { ...keywordDraft, keywords: keywordValidation.normalizedKeywords },
+          keywordValidation,
+        ),
+      });
+      const readyResearch: AdobePopulationResearch = {
+        ...existing,
+        assetId: asset.id,
+        status: "ready",
+        stale: false,
+        query,
+        locale,
+        assetType,
+        sort,
+        samples: rankedSamples,
+        keywordAggregation,
+        recommendationTitleFromPopulation: analysis.recommendationTitleFromPopulation,
+        recommendedFocusKeywords: analysis.recommendedFocusKeywords,
+        selectedTitleSource: null,
+        selectedTitle: undefined,
+        selectedKeywords: appliedPopulationKeywords,
+        warnings: existing.warnings,
+      };
+      useAppStore.getState().recordGeminiUsage(analysis.usage);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
+      saveResearchState(readyResearch);
+      addNotice(
+        "success",
+        `${asset.filename}: population research selesai (${rankedSamples.filter((sample) => sample.metadataStatus === "extracted").length}/${rankedSamples.length} metadata terbaca); ${automaticallyAppliedKeywords.length} keyword population otomatis diterapkan.`,
+      );
+    } catch (error) {
+      patchResearchState(asset.id, { status: "failed", warnings: [...existing.warnings, populationWarning(error instanceof Error ? error.message : String(error), "population-analysis")] }, candidate);
+      addNotice("error", `Population research gagal: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleCancelPopulationResearch = () => {
+    if (!selectedAssetId) return;
+    void cancelPopulationAnalysis(selectedAssetId).catch((error) => addNotice("warning", `Pembatalan Research gagal: ${error instanceof Error ? error.message : String(error)}`));
+  };
+
+  const handlePopulationConfigChange = (patch: { query?: string; locale?: string; assetType?: AdobePopulationAssetType; sort?: AdobePopulationSort; sampleLimit?: number }) => {
+    if (!selectedAssetId) return;
+    const current = useAppStore.getState().populationResearch[selectedAssetId] ?? (selectedInitialCandidate ? populationResearchForAsset(selectedAssetId, selectedInitialCandidate) : emptyPopulationResearch(selectedAssetId));
+    patchResearchState(selectedAssetId, { ...patch, stale: true, status: current.status === "ready" || current.status === "review" ? "idle" : current.status });
+  };
+
+  const handleChoosePopulationTitle = (source: "initial" | "population" | "custom") => {
+    if (!selectedAsset || !selectedInitialCandidate || !selectedPopulationResearch) return;
+    const current = selectedAsset.metadata ?? emptyMetadata(selectedAsset, settings.metadataMode);
+    const title = selectPopulationTitle(source, selectedInitialCandidate, selectedPopulationResearch, current.title);
+    const draft = { ...current, title, assetId: selectedAsset.id };
+    const validation = validateMetadata(selectedAsset.filename, draft);
+    updateMetadata(selectedAsset.id, { ...draft, keywords: validation.normalizedKeywords, warnings: validation.warnings, qualityScore: qualityScore({ ...draft, keywords: validation.normalizedKeywords }, validation) });
+    patchResearchState(selectedAsset.id, { selectedTitleSource: source, selectedTitle: title });
+  };
+
+  const handleTogglePopulationKeyword = (keyword: string) => {
+    if (!selectedAssetId) return;
+    const current = useAppStore.getState().populationResearch[selectedAssetId];
+    if (!current) return;
+    const selectedKeywords = current.selectedKeywords.includes(keyword) ? current.selectedKeywords.filter((value) => value !== keyword) : [...current.selectedKeywords, keyword];
+    patchResearchState(selectedAssetId, { selectedKeywords });
+  };
+
+  const handleApplyPopulationKeywords = () => {
+    if (!selectedAsset || !selectedPopulationResearch) return;
+    const current = selectedAsset.metadata ?? emptyMetadata(selectedAsset, settings.metadataMode);
+    const recommended = selectedPopulationResearch.keywordAggregation.filter((keyword) => selectedPopulationResearch.selectedKeywords.includes(keyword.normalizedKeyword)).map((keyword) => keyword.keyword);
+    const nextKeywords = [...current.keywords, ...recommended.filter((keyword) => !current.keywords.some((value) => value.toLowerCase() === keyword.toLowerCase()))];
+    const draft = { ...current, assetId: selectedAsset.id, keywords: nextKeywords };
+    const validation = validateMetadata(
+      selectedAsset.filename,
+      draft,
+      MAX_POPULATION_KEYWORDS,
+    );
+    updateMetadata(selectedAsset.id, { ...draft, keywords: validation.normalizedKeywords, warnings: validation.warnings, qualityScore: qualityScore({ ...draft, keywords: validation.normalizedKeywords }, validation) });
+    addNotice("success", `${recommended.length} keyword population yang didukung gambar ditambahkan.`);
+  };
   const bulkEdit = (transform: (metadata: StockMetadata) => StockMetadata) => {
     const currentAssets = useAppStore.getState().assets;
     selectedAssetIds.forEach((assetId) => {
@@ -170,6 +458,7 @@ export default function App() {
     });
   };
   const bulkSetCategory = (category: number) => bulkEdit((metadata) => ({ ...metadata, category }));
+  const bulkSetContentSource = (contentSource: StockMetadata["contentSource"]) => bulkEdit((metadata) => ({ ...metadata, contentSource }));
   const bulkAddKeyword = (keyword: string) => bulkEdit((metadata) => ({ ...metadata, keywords: [...metadata.keywords, keyword] }));
   const bulkRemoveKeyword = (keyword: string) => bulkEdit((metadata) => ({ ...metadata, keywords: metadata.keywords.filter((value) => value.toLowerCase() !== keyword.toLowerCase()) }));
   const bulkRegenerate = () => { selectedAssetIds.forEach((assetId) => setAssetStatus(assetId, "queued")); void runGeneration({ assetIds: selectedAssetIds, scope: "full" }); };
@@ -238,6 +527,8 @@ export default function App() {
         onModeChange={(metadataMode: MetadataMode) => setSettings({ ...settings, metadataMode })}
         onExport={startExport}
         canExport={assets.length > 0}
+        activeView={activeView}
+        onViewChange={setActiveView}
       />
       {!apiKeyConfigured ? (
         <div className="flex h-10 shrink-0 items-center justify-center gap-2 border-b border-amber-500/20 bg-amber-500/10 text-[11px] font-semibold text-ink">
@@ -274,41 +565,64 @@ export default function App() {
 
       {isGenerating ? <ProgressBar progress={progress} jobs={jobs.length} /> : null}
 
-      <main className="flex min-h-0 flex-1 gap-4 bg-surface-muted p-4">
-        <MetadataTable
-          assets={assets}
-          selectedAssetId={selectedAssetId}
-          selectedAssetIds={selectedAssetIds}
-          isGenerating={isGenerating}
-          isAddingAssets={isAddingAssets}
-          additionalPrompt={settings.additionalPrompt}
-          onAdditionalPromptChange={(additionalPrompt) => setSettings({ ...settings, additionalPrompt })}
-          onSelect={setSelectedAssetId}
-          onToggle={toggleSelectedAsset}
-          onRemove={removeAsset}
-          onClearCompleted={clearCompleted}
-          onClearAll={clearAll}
-          onRetryFailed={() => { void runGeneration({ onlyFailed: true }); }}
-          onDrop={handleDrop}
-          onChoose={addImages}
-          onAddFolder={addFolder}
-          onSelectAll={() => selectedAssetIds.length === assets.length ? clearSelection() : selectAll()}
-          onSetCategory={bulkSetCategory}
-          onAddKeyword={bulkAddKeyword}
-          onRemoveKeyword={bulkRemoveKeyword}
-          onRegenerate={bulkRegenerate}
-        />
-        {selectedAsset ? (
-          <Inspector
-            asset={selectedAsset}
-            mode={settings.metadataMode}
-            onClose={() => setSelectedAssetId(undefined)}
-            onUpdate={updateMetadata}
-            onRegenerate={regenerate}
-            onUndo={undoRegenerate}
+      {activeView === "standard" ? (
+        <main className="flex min-h-0 flex-1 gap-4 bg-surface-muted p-4">
+          <MetadataTable
+            assets={assets}
+            selectedAssetId={selectedAssetId}
+            selectedAssetIds={selectedAssetIds}
+            isGenerating={isGenerating}
+            isAddingAssets={isAddingAssets}
+            additionalPrompt={settings.additionalPrompt}
+            onAdditionalPromptChange={(additionalPrompt) => setSettings({ ...settings, additionalPrompt })}
+            onSelect={setSelectedAssetId}
+            onToggle={toggleSelectedAsset}
+            onRemove={removeAsset}
+            onClearCompleted={clearCompleted}
+            onClearAll={clearAll}
+            onRetryFailed={() => { void runGeneration({ onlyFailed: true }); }}
+            onDrop={handleDrop}
+            onChoose={addImages}
+            onAddFolder={addFolder}
+            onSelectAll={() => selectedAssetIds.length === assets.length ? clearSelection() : selectAll()}
+            onSetCategory={bulkSetCategory}
+            onSetContentSource={bulkSetContentSource}
+            onAddKeyword={bulkAddKeyword}
+            onRemoveKeyword={bulkRemoveKeyword}
+            onRegenerate={bulkRegenerate}
           />
-        ) : null}
-      </main>
+          {selectedAsset ? (
+            <Inspector
+              asset={selectedAsset}
+              mode={settings.metadataMode}
+              onClose={() => setSelectedAssetId(undefined)}
+              onUpdate={updateMetadata}
+              onRegenerate={regenerate}
+              onUndo={undoRegenerate}
+            />
+          ) : null}
+        </main>
+      ) : (
+        <main className="flex min-h-0 flex-1 bg-surface-muted p-4">
+          <StagedResearchPage
+            assets={assets}
+            selectedAsset={selectedAsset}
+            onSelectAsset={setSelectedAssetId}
+            candidate={selectedInitialCandidate}
+            research={selectedPopulationResearch}
+            canUseGemini={apiKeyVerified && !offline}
+            canSearch={!offline}
+            onAnalyzeInitial={() => void handleAnalyzeInitial()}
+            onResearch={() => void handleResearchPopulation()}
+            onAnalyzePopulation={() => void handleAnalyzePopulation()}
+            onCancel={handleCancelPopulationResearch}
+            onConfigChange={handlePopulationConfigChange}
+            onChooseTitle={handleChoosePopulationTitle}
+            onToggleKeyword={handleTogglePopulationKeyword}
+            onApplyKeywords={handleApplyPopulationKeywords}
+          />
+        </main>
+      )}
 
       <footer className="flex h-[40px] shrink-0 items-center justify-between border-t border-line bg-surface px-6 text-[11px] font-semibold text-ink-muted">
         <div className="flex items-center gap-4">
@@ -442,4 +756,21 @@ function downloadCsv(rows: { filename: string; title: string; keywords: string[]
   anchor.download = "adobe-stock-metadata.csv";
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function emptyPopulationResearch(assetId: string): AdobePopulationResearch {
+  return {
+    assetId,
+    status: "idle",
+    stale: false,
+    samples: [],
+    keywordAggregation: [],
+    selectedTitleSource: null,
+    selectedKeywords: [],
+    warnings: [],
+  };
+}
+
+function populationWarning(message: string, code: string) {
+  return { code, message, severity: "warning" as const };
 }

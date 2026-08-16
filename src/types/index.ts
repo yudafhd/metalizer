@@ -71,7 +71,7 @@ export interface BatchJob {
 
 export interface AppSettings {
   model: string;
-  modelPreset: "balanced" | "fast" | "custom";
+  modelPreset: "balanced" | "fast" | "population" | "populationPro" | "custom";
   customModel: string;
   batchSize: 1 | 2 | 3 | 4 | 5 | 6;
   concurrency: 1 | 2 | 3;
@@ -151,6 +151,149 @@ export interface MetadataGenerationResult {
   assets: GeneratedMetadata[];
   missingIds: string[];
   warnings: string[];
+  attempts: number;
+  usage: GeminiUsageMetadata;
+}
+
+export type PopulationResearchStatus = "idle" | "initializing" | "searching" | "review" | "extracted" | "analyzing" | "ready" | "failed";
+export type AdobePopulationAssetType = "vector" | "illustration" | "photo" | "image";
+export type AdobePopulationSort = "relevance" | "nb_downloads" | "creation";
+export type PopulationTitleSource = "initial" | "population" | "custom" | null;
+
+export interface InitialCandidate {
+  assetId: string;
+  searchQuery: string;
+  searchTerms: string[];
+  initialTitle: string;
+  visualFacts: string[];
+  assetType?: string;
+  visualStyle?: string;
+  category: number;
+  confidence: number;
+}
+
+export interface InitialCandidateRequest {
+  assetId: string;
+  imagePath: string;
+  model: string;
+}
+
+export interface AdobePopulationSearchRequest {
+  assetId: string;
+  query: string;
+  locale: string;
+  assetType: AdobePopulationAssetType;
+  sort: AdobePopulationSort;
+  limit: number;
+}
+
+export interface AdobePopulationSearchResult {
+  rank: number;
+  url: string;
+  assetId?: string;
+  searchTitle?: string;
+  title?: string;
+  keywords?: string[];
+  category?: number;
+  contributor?: string;
+  assetType?: string;
+  creationDate?: string;
+  thumbnailUrl?: string;
+}
+
+export interface AdobePopulationSearchResponse {
+  searchUrl: string;
+  query: string;
+  locale: string;
+  assetType: AdobePopulationAssetType;
+  sort: AdobePopulationSort;
+  results: AdobePopulationSearchResult[];
+  totalFound: number;
+  warnings: string[];
+}
+
+export interface PopulationSearchProgressPayload {
+  assetId: string;
+  current: number;
+  total: number;
+  currentUrl: string;
+  title?: string;
+  keywordsCount: number;
+  statusText: string;
+}
+
+export interface AdobePopulationSample {
+  sampleRank: number;
+  url: string;
+  assetId?: string;
+  searchTitle?: string;
+  title?: string;
+  keywords: string[];
+  category?: number;
+  contributor?: string;
+  assetType?: string;
+  creationDate?: string;
+  creationRank?: number;
+  freshnessScore?: number;
+  estimatedMonth?: number | null;
+  estimatedYear?: number | null;
+  dateSource?: string;
+  dateConfidence: number;
+  metadataStatus: "extracted" | "unavailable" | "failed";
+  extractionError?: string;
+}
+
+export interface PopulationKeyword {
+  keyword: string;
+  normalizedKeyword: string;
+  group: "primary_subject" | "visible_details" | "asset_type_function" | "visual_style_format" | "commercial_use" | "event_context" | "other";
+  frequency: number;
+  sampleCount: number;
+  bestSampleRank: number;
+  averageSampleRank: number;
+  bestKeywordPosition: number;
+  averageKeywordPosition: number;
+  semanticMatch: number;
+  distinctivenessAdjustment: number;
+  populationScore: number;
+  supportedByInput: boolean;
+}
+
+export interface AdobePopulationResearch {
+  assetId: string;
+  status: PopulationResearchStatus;
+  stale: boolean;
+  searchUrl?: string;
+  query?: string;
+  locale?: string;
+  assetType?: AdobePopulationAssetType;
+  sort?: AdobePopulationSort;
+  sampleLimit?: number;
+  samples: AdobePopulationSample[];
+  creationResults?: AdobePopulationSearchResult[];
+  keywordAggregation: PopulationKeyword[];
+  recommendationTitleFromPopulation?: string;
+  recommendedFocusKeywords?: string[];
+  selectedTitleSource: PopulationTitleSource;
+  selectedTitle?: string;
+  selectedKeywords: string[];
+  warnings: MetadataWarning[];
+}
+
+export interface PopulationAnalysisRequest {
+  assetId: string;
+  imagePath: string;
+  model: string;
+  initialCandidate: InitialCandidate;
+  samples: AdobePopulationSample[];
+  assetType: AdobePopulationAssetType;
+  sort: AdobePopulationSort;
+  locale: string;
+}
+
+export interface PopulationAnalysisResponse {
+  recommendationTitleFromPopulation: string;
+  recommendedFocusKeywords: string[];
   attempts: number;
   usage: GeminiUsageMetadata;
 }

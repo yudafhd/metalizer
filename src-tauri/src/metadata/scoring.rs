@@ -2,7 +2,12 @@ use std::collections::HashSet;
 
 use super::validator::MetadataValidation;
 
-pub fn quality_score(title: &str, keywords: &[String], category: u8, validation: &MetadataValidation) -> u8 {
+pub fn quality_score(
+    title: &str,
+    keywords: &[String],
+    category: u8,
+    validation: &MetadataValidation,
+) -> u8 {
     let title_quality = if !title.trim().is_empty() && title.chars().count() <= 70 {
         20
     } else {
@@ -22,9 +27,17 @@ pub fn quality_score(title: &str, keywords: &[String], category: u8, validation:
     } else {
         ((unique.len() as f32 / keywords.len() as f32) * 15.0).round() as u8
     };
-    let first_ten = if keywords.len() >= 10 { 25 } else { (keywords.len() as u8 * 25) / 10 };
+    let first_ten = if keywords.len() >= 10 {
+        25
+    } else {
+        (keywords.len() as u8 * 25) / 10
+    };
     let category_score = if (1..=21).contains(&category) { 10 } else { 0 };
-    let completeness = if !title.trim().is_empty() && !keywords.is_empty() { 10 } else { 0 };
+    let completeness = if !title.trim().is_empty() && !keywords.is_empty() {
+        10
+    } else {
+        0
+    };
     let safety = if validation.valid { 10 } else { 3 };
     title_quality + keyword_count + uniqueness + first_ten + category_score + completeness + safety
 }

@@ -2,7 +2,10 @@ use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=LICENSE_PUBLIC_KEY");
-    if std::env::var("LICENSE_PUBLIC_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false) {
+    if std::env::var("LICENSE_PUBLIC_KEY")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false)
+    {
         // Environment variable already provided
     } else {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();

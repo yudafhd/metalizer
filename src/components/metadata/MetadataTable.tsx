@@ -1,9 +1,9 @@
-import { AlertCircle, CheckCircle2, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, Plus, RotateCcw, Square, Tag, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
 import { AdditionalPromptBar } from "./AdditionalPromptBar";
-import type { StockAsset } from "../../types";
+import type { ContentSource, StockAsset } from "../../types";
 import { metadataLabel } from "../../utils/metadata";
 
 interface MetadataTableProps {
@@ -24,6 +24,7 @@ interface MetadataTableProps {
   onAddFolder: () => void;
   onSelectAll: () => void;
   onSetCategory: (category: number) => void;
+  onSetContentSource: (contentSource: ContentSource) => void;
   onAddKeyword: (keyword: string) => void;
   onRemoveKeyword: (keyword: string) => void;
   onRegenerate: () => void;
@@ -48,13 +49,15 @@ export function MetadataTable({
   onAddFolder,
   onSelectAll,
   onSetCategory,
+  onSetContentSource,
   onAddKeyword,
   onRemoveKeyword,
   onRegenerate,
   onAdditionalPromptChange,
 }: MetadataTableProps) {
   const allSelected = assets.length > 0 && selectedAssetIds.length === assets.length;
-  const [category, setCategory] = useState(8);
+  const [category, setCategory] = useState<number | "">("");
+  const [contentSource, setContentSource] = useState<ContentSource | "">("");
   const [keyword, setKeyword] = useState("");
   const [removeKeyword, setRemoveKeyword] = useState("");
 
@@ -150,17 +153,55 @@ export function MetadataTable({
             <select
               className="app-select h-8 w-[190px] text-[11px]"
               value={category}
-              onChange={(event) => setCategory(Number(event.target.value))}
+              onChange={(event) => setCategory(event.target.value ? Number(event.target.value) : "")}
             >
-              <option value={8}>Atur kategori…</option>
+              <option value="">Set category...</option>
               {ADOBE_CATEGORIES.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.id} — {item.name}
                 </option>
               ))}
             </select>
-            <button className="app-button h-8 px-2.5 text-[11px]" onClick={() => onSetCategory(category)}>
-              Terapkan
+            <button
+              type="button"
+              className="app-button h-8 w-8 px-0"
+              disabled={category === ""}
+              title="Terapkan kategori ke aset terpilih"
+              aria-label="Terapkan kategori ke aset terpilih"
+              onClick={() => {
+                if (category !== "") {
+                  onSetCategory(category);
+                  setCategory("");
+                }
+              }}
+            >
+              <Check size={14} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <select
+              className="app-select h-8 w-[190px] text-[11px]"
+              value={contentSource}
+              onChange={(event) => setContentSource(event.target.value as ContentSource | "")}
+            >
+              <option value="">Sumber konten...</option>
+              <option value="standard">Standard</option>
+              <option value="generative-ai">Generative AI</option>
+            </select>
+            <button
+              type="button"
+              className="app-button h-8 w-8 px-0"
+              disabled={contentSource === ""}
+              title="Terapkan sumber konten ke aset terpilih"
+              aria-label="Terapkan sumber konten ke aset terpilih"
+              onClick={() => {
+                if (contentSource !== "") {
+                  onSetContentSource(contentSource);
+                  setContentSource("");
+                }
+              }}
+            >
+              <Check size={14} />
             </button>
           </div>
           <div className="flex items-center gap-1.5">
@@ -173,8 +214,15 @@ export function MetadataTable({
               }}
               placeholder="Tambah keyword"
             />
-            <button className="app-button h-8 px-2.5 text-[11px]" onClick={submitAdd}>
-              Tambah
+            <button
+              type="button"
+              className="app-button h-8 w-8 px-0"
+              disabled={!keyword.trim()}
+              title="Tambah keyword ke aset terpilih"
+              aria-label="Tambah keyword ke aset terpilih"
+              onClick={submitAdd}
+            >
+              <Plus size={14} />
             </button>
           </div>
           <div className="flex items-center gap-1.5">
@@ -187,12 +235,26 @@ export function MetadataTable({
               }}
               placeholder="Hapus keyword"
             />
-            <button className="app-button h-8 px-2.5 text-[11px]" onClick={submitRemove}>
-              <X size={12} /> Hapus
+            <button
+              type="button"
+              className="app-button h-8 w-8 px-0"
+              disabled={!removeKeyword.trim()}
+              title="Hapus keyword dari aset terpilih"
+              aria-label="Hapus keyword dari aset terpilih"
+              onClick={submitRemove}
+            >
+              <X size={14} />
             </button>
           </div>
-          <button className="app-button app-button-primary h-8 px-2.5 text-[11px]" onClick={onRegenerate}>
-            <RotateCcw size={12} /> Generate ulang
+          <button
+            type="button"
+            className="app-button app-button-primary h-8 px-2.5 text-[11px]"
+            disabled={isGenerating}
+            title="Generate metadata untuk aset terpilih"
+            aria-label="Generate metadata untuk aset terpilih"
+            onClick={onRegenerate}
+          >
+            <RotateCcw size={12} /> Generate
           </button>
         </div>
       ) : null}

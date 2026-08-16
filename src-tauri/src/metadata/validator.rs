@@ -34,14 +34,26 @@ pub fn validate_metadata(
         warnings.push(warning("title-required", "Title wajib diisi", "error"));
     }
     if trimmed_title.chars().count() > 70 {
-        warnings.push(warning("title-too-long", "Title lebih dari 70 karakter", "error"));
+        warnings.push(warning(
+            "title-too-long",
+            "Title lebih dari 70 karakter",
+            "error",
+        ));
     }
     if trimmed_title.contains(['\n', '\r']) {
-        warnings.push(warning("title-line-break", "Title harus satu baris", "error"));
+        warnings.push(warning(
+            "title-line-break",
+            "Title harus satu baris",
+            "error",
+        ));
     }
     let title_word_count = trimmed_title.split_whitespace().count();
     if !trimmed_title.is_empty() && !(5..=10).contains(&title_word_count) {
-        warnings.push(warning("title-word-count", "Title sebaiknya terdiri dari 5–10 kata yang natural", "warning"));
+        warnings.push(warning(
+            "title-word-count",
+            "Title sebaiknya terdiri dari 5–10 kata yang natural",
+            "warning",
+        ));
     }
     if contains_filename(trimmed_title, filename) {
         warnings.push(warning(
@@ -53,7 +65,11 @@ pub fn validate_metadata(
 
     let normalized_keywords = normalize_keywords(keywords, filename, maximum_keywords);
     if normalized_keywords.is_empty() {
-        warnings.push(warning("keywords-required", "Minimal satu keyword wajib diisi", "error"));
+        warnings.push(warning(
+            "keywords-required",
+            "Minimal satu keyword wajib diisi",
+            "error",
+        ));
     }
     if normalized_keywords.len() < 10 {
         warnings.push(warning(
@@ -96,7 +112,11 @@ pub fn validate_metadata(
         ));
     }
     if !(1..=21).contains(&category) {
-        warnings.push(warning("category-invalid", "Kategori harus berada di antara 1 sampai 21", "error"));
+        warnings.push(warning(
+            "category-invalid",
+            "Kategori harus berada di antara 1 sampai 21",
+            "error",
+        ));
     }
     MetadataValidation {
         valid: !warnings.iter().any(|item| item.severity == "error"),

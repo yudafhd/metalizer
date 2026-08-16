@@ -1,6 +1,8 @@
 export const GEMINI_MODELS = {
   balanced: "gemini-3.5-flash-lite",
   fast: "gemini-3.1-flash-lite",
+  population: "gemini-3.6-flash",
+  populationPro: "gemini-3.1-pro-preview",
 } as const;
 
 export const LEGACY_GEMINI_MODELS = new Set([

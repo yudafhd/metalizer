@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use crate::ai::prompts::{system_prompt, user_prompt};
 use crate::ai::schema::metadata_response_schema;
 use crate::errors::{AppError, AppResult};
-use crate::models::{GeminiUsageMetadata, GeneratedMetadata, GenerateMetadataRequest, MetadataGenerationResult};
+use crate::models::{
+    GeminiUsageMetadata, GenerateMetadataRequest, GeneratedMetadata, MetadataGenerationResult,
+};
 
 pub struct GeminiMetadataProvider {
     api_key: String,
@@ -89,11 +91,15 @@ impl GeminiMetadataProvider {
                     }
                     Err(error) if attempt < 3 => {
                         last_error = Some(error);
-                        sleep_or_cancel(self.cancellation.clone(), Duration::from_secs(match attempt {
-                            1 => 2,
-                            2 => 5,
-                            _ => 10,
-                        })).await?;
+                        sleep_or_cancel(
+                            self.cancellation.clone(),
+                            Duration::from_secs(match attempt {
+                                1 => 2,
+                                2 => 5,
+                                _ => 10,
+                            }),
+                        )
+                        .await?;
                     }
                     Err(error) => return Err(error),
                 },
@@ -121,7 +127,11 @@ impl GeminiMetadataProvider {
             return Err(AppError::Cancelled);
         }
 
-        let request = client.post(url).query(&[("key", self.api_key.as_str())]).json(body).send();
+        let request = client
+            .post(url)
+            .query(&[("key", self.api_key.as_str())])
+            .json(body)
+            .send();
         let response = tokio::select! {
             _ = wait_for_cancellation(self.cancellation.clone()) => return Err(AppError::Cancelled),
             response = request => response.map_err(|error| {
@@ -283,7 +293,10 @@ fn parse_json_text(text: &str) -> AppResult<StructuredOutput> {
                 .map(str::trim);
             if let Some(cleaned) = cleaned {
                 serde_json::from_str(cleaned).map_err(|error| {
-                    AppError::GeminiResponse(format!("Structured JSON could not be parsed: {}", error))
+                    AppError::GeminiResponse(format!(
+                        "Structured JSON could not be parsed: {}",
+                        error
+                    ))
                 })
             } else {
                 Err(AppError::GeminiResponse(format!(

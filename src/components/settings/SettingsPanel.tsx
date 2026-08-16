@@ -211,12 +211,22 @@ export function SettingsPanel({
                     const preset = event.target.value as AppSettings["modelPreset"];
                     update({
                       modelPreset: preset,
-                      model: preset === "balanced" ? GEMINI_MODELS.balanced : preset === "fast" ? GEMINI_MODELS.fast : settings.model,
+                      model: preset === "balanced"
+                        ? GEMINI_MODELS.balanced
+                        : preset === "fast"
+                          ? GEMINI_MODELS.fast
+                          : preset === "population"
+                            ? GEMINI_MODELS.population
+                            : preset === "populationPro"
+                              ? GEMINI_MODELS.populationPro
+                              : settings.model,
                     });
                   }}
                 >
                   <option value="balanced">Seimbang · Gemini 3.5 Flash Lite</option>
                   <option value="fast">Cepat · Gemini 3.1 Flash Lite</option>
+                  <option value="population">Population · Gemini 3.6 Flash</option>
+                  <option value="populationPro">Population Pro · Gemini 3.1 Pro Preview (API berbayar)</option>
                   <option value="custom">ID model khusus</option>
                 </select>
               </Field>

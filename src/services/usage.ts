@@ -1,6 +1,6 @@
 import { preferencesStore } from "./store";
 
-import type { DailyUsage, GeminiUsageMetadata } from "../types";
+import type { AppSettings, DailyUsage, GeminiErrorKind, GeminiUsageMetadata } from "../types";
 
 const usageKey = "gemini-daily-usage";
 
@@ -29,6 +29,9 @@ export function normalizeDailyUsage(value: Partial<DailyUsage> | null | undefine
     promptTokens: Math.max(0, Number(value.promptTokens) || 0),
     outputTokens: Math.max(0, Number(value.outputTokens) || 0),
     totalTokens: Math.max(0, Number(value.totalTokens) || 0),
+    lastErrorKind: value.lastErrorKind,
+    lastErrorMessage: typeof value.lastErrorMessage === "string" ? value.lastErrorMessage : undefined,
+    lastErrorAt: typeof value.lastErrorAt === "string" ? value.lastErrorAt : undefined,
   };
 }
 
@@ -66,4 +69,32 @@ export function formatTokenCount(value: number): string {
   if (value < 1_000) return String(value);
   if (value < 1_000_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
   return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}m`;
+}
+
+export function remainingTokenBudget(usage: DailyUsage, budget: number): number | null {
+  const normalizedBudget = Math.max(0, Number(budget) || 0);
+  if (!normalizedBudget) return null;
+  return Math.max(0, normalizedBudget - usage.totalTokens);
+}
+
+export function tokenBudgetPercent(usage: DailyUsage, budget: number): number | null {
+  const normalizedBudget = Math.max(0, Number(budget) || 0);
+  if (!normalizedBudget) return null;
+  return Math.min(100, Math.round((usage.totalTokens / normalizedBudget) * 100));
+}
+
+export function isTokenBudgetExhausted(settings: AppSettings, usage: DailyUsage): boolean {
+  const budget = Math.max(0, Number(settings.dailyTokenBudget) || 0);
+  return budget > 0 && usage.totalTokens >= budget;
+}
+
+export function classifyGeminiError(message: string): GeminiErrorKind {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("quota_exceeded") || normalized.includes("quota exceeded") || normalized.includes("daily quota")) {
+    return "quota_exceeded";
+  }
+  if (normalized.includes("rate_limit_exceeded") || normalized.includes("rate limit") || normalized.includes("batas request") || normalized.includes("429")) {
+    return "rate_limit_exceeded";
+  }
+  return "unknown";
 }

@@ -6,13 +6,14 @@ import type {
   AdobePopulationSample,
   InitialCandidate,
   InitialCandidateRequest,
+  InitialCandidateResponse,
   PopulationAnalysisRequest,
   PopulationAnalysisResponse,
   PopulationKeyword,
 } from "../types";
 import { invokeCommand } from "./tauri";
 
-export function analyzeInitialCandidate(request: InitialCandidateRequest): Promise<InitialCandidate> {
+export function analyzeInitialCandidate(request: InitialCandidateRequest): Promise<InitialCandidateResponse> {
   return invokeCommand("analyze_initial_candidate", { request });
 }
 
@@ -45,6 +46,7 @@ export function populationResearchForAsset(assetId: string, candidate: InitialCa
     locale: "id",
     assetType: "vector",
     sort: "relevance",
+    availableCohorts: ["relevance"],
     samples: [],
     keywordAggregation: [],
     selectedTitleSource: null,

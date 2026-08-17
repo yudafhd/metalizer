@@ -18,11 +18,11 @@ import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
 import { aggregatePopulationKeywords, analyzeAdobePopulation, analyzeInitialCandidate, calculatePopulationRanking, cancelPopulationAnalysis, populationResearchForAsset, searchAdobePopulation } from "./services/population";
 import { loadPopulationState, saveInitialCandidate, savePopulationResearch } from "./services/populationStore";
-import { formatTokenCount, readDailyUsage, writeDailyUsage } from "./services/usage";
+import { formatTokenCount, isTokenBudgetExhausted, readDailyUsage, remainingTokenBudget, writeDailyUsage } from "./services/usage";
 import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata";
 import { serializeAdobeCsv } from "./utils/csv";
 import type { AdobePopulationAssetType, AdobePopulationResearch, AdobePopulationSample, AdobePopulationSort, ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
-import { selectPopulationTitle, validatePopulationQuery } from "./utils/population";
+import { calculatePopulationConfidence, normalizeKeyword, scorePopulationTitle, selectAutomatedPopulationTitle, selectFinalPopulationKeywords, selectPopulationTitle, validatePopulationQuery } from "./utils/population";
 
 const MAX_POPULATION_KEYWORDS = 35;
 
@@ -40,7 +40,7 @@ export default function App() {
   const notices = useAppStore((state) => state.notices);
   const initialCandidates = useAppStore((state) => state.initialCandidates);
   const populationResearch = useAppStore((state) => state.populationResearch);
-  const { addAssets, removeAsset, clearCompleted, clearAll, patchAsset, setSettings, setSelectedAssetId, toggleSelectedAsset, selectAll, clearSelection, setApiKeyConfigured, setApiKeyVerified, setDailyUsage, addNotice, dismissNotice, setAssetStatus, setInitialCandidates, setInitialCandidate, setPopulationResearch } = useAppStore();
+  const { addAssets, removeAsset, clearCompleted, clearAll, patchAsset, setSettings, setSelectedAssetId, toggleSelectedAsset, selectAll, clearSelection, setApiKeyConfigured, setApiKeyVerified, setDailyUsage, addNotice, dismissNotice, setAssetStatus, setInitialCandidates, setInitialCandidate, setPopulationResearch, recordGeminiError, clearGeminiError } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -196,13 +196,20 @@ export default function App() {
     const asset = selectedAssetId ? useAppStore.getState().assets.find((item) => item.id === selectedAssetId) : undefined;
     if (!asset) return;
     if (!apiKeyVerified || offline) { addNotice("warning", "Verifikasi API key dan koneksi internet diperlukan untuk analisis Research."); return; }
+    if (isTokenBudgetExhausted(settings, useAppStore.getState().dailyUsage)) {
+      addNotice("warning", "Budget token harian lokal sudah habis. Naikkan budget atau set 0 untuk menonaktifkan pembatas.");
+      return;
+    }
     patchResearchState(asset.id, { status: "initializing", stale: false, warnings: [] });
     try {
-      const candidate = await analyzeInitialCandidate({
+      const initialResponse = await analyzeInitialCandidate({
         assetId: asset.id,
         imagePath: asset.path,
         model: settings.modelPreset === "custom" ? settings.customModel : settings.model,
       });
+      const candidate = initialResponse.candidate;
+      useAppStore.getState().recordGeminiUsage(initialResponse.usage);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
       setInitialCandidate(candidate);
       await saveInitialCandidate(candidate);
       const currentMetadata = asset.metadata ?? emptyMetadata(asset, settings.metadataMode);
@@ -227,6 +234,8 @@ export default function App() {
       await savePopulationResearch(research);
       addNotice("success", `${asset.filename}: kandidat awal tersimpan dan judul utama otomatis diterapkan. Review query sebelum research Adobe.`);
     } catch (error) {
+      recordGeminiError(error);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
       patchResearchState(asset.id, { status: "failed", warnings: [populationWarning(error instanceof Error ? error.message : String(error), "initial-analysis")] });
       addNotice("error", `Kandidat awal gagal: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -257,6 +266,9 @@ export default function App() {
       creationResults: undefined,
       keywordAggregation: [],
       recommendationTitleFromPopulation: undefined,
+      titleScore: undefined,
+      selectedTitleScore: undefined,
+      automaticTitleSelection: undefined,
       recommendedFocusKeywords: undefined,
       selectedTitleSource: null,
       selectedTitle: undefined,
@@ -281,6 +293,9 @@ export default function App() {
           assetType: result.assetType,
           creationDate: result.creationDate,
           dateConfidence: result.creationDate ? 100 : 0,
+          sourceCohort: "relevance",
+          rawKeywords: [...(result.keywords ?? [])],
+          normalizedKeywords: (result.keywords ?? []).map(normalizeKeyword),
           metadataStatus: hasKeywords ? ("extracted" as const) : ("unavailable" as const),
         };
       });
@@ -295,8 +310,12 @@ export default function App() {
         searchUrl: relevance.searchUrl,
         samples,
         creationResults: creation.results,
+        availableCohorts: creation.results.length ? ["relevance", "freshness"] : ["relevance"],
         keywordAggregation: [],
         recommendationTitleFromPopulation: undefined,
+        titleScore: undefined,
+        selectedTitleScore: undefined,
+        automaticTitleSelection: undefined,
         recommendedFocusKeywords: undefined,
         selectedTitleSource: null,
         selectedTitle: undefined,
@@ -321,6 +340,10 @@ export default function App() {
       return;
     }
     if (!apiKeyVerified || offline) { addNotice("warning", "Verifikasi API key Gemini dan koneksi internet diperlukan untuk langkah berikutnya."); return; }
+    if (isTokenBudgetExhausted(settings, useAppStore.getState().dailyUsage)) {
+      addNotice("warning", "Budget token harian lokal sudah habis. Naikkan budget atau set 0 untuk menonaktifkan pembatas.");
+      return;
+    }
     const query = existing.query?.trim() || candidate.searchQuery;
     const locale = existing.locale?.trim() || "id";
     const assetType = existing.assetType ?? "vector";
@@ -339,8 +362,30 @@ export default function App() {
       });
       const rankedSamples = await calculatePopulationRanking(existing.samples, existing.creationResults ?? []);
       const keywordAggregation = await aggregatePopulationKeywords(rankedSamples, candidate.visualFacts);
-      const automaticKeywords = keywordAggregation.slice(0, MAX_POPULATION_KEYWORDS);
       const currentMetadata = asset.metadata ?? emptyMetadata(asset, settings.metadataMode);
+      const automaticTitleSelection = selectAutomatedPopulationTitle(
+        candidate,
+        analysis.recommendationTitleFromPopulation,
+        rankedSamples,
+        keywordAggregation,
+        currentMetadata.title,
+      );
+      const automaticKeywords = selectFinalPopulationKeywords(
+        keywordAggregation,
+        automaticTitleSelection.title,
+        MAX_POPULATION_KEYWORDS,
+      );
+      const confidence = calculatePopulationConfidence(
+        rankedSamples,
+        keywordAggregation,
+        automaticTitleSelection.title,
+      );
+      const titleScore = scorePopulationTitle(
+        analysis.recommendationTitleFromPopulation,
+        candidate,
+        rankedSamples,
+        keywordAggregation,
+      );
       const existingKeywordSet = new Set(
         currentMetadata.keywords.map((keyword) => keyword.toLowerCase()),
       );
@@ -350,7 +395,7 @@ export default function App() {
           .map((keyword) => keyword.keyword)
           .filter((keyword) => !existingKeywordSet.has(keyword.toLowerCase())),
       ];
-      const keywordDraft = { ...currentMetadata, assetId: asset.id, keywords: mergedKeywords };
+      const keywordDraft = { ...currentMetadata, assetId: asset.id, title: automaticTitleSelection.title, keywords: mergedKeywords };
       const keywordValidation = validateMetadata(
         asset.filename,
         keywordDraft,
@@ -385,20 +430,42 @@ export default function App() {
         samples: rankedSamples,
         keywordAggregation,
         recommendationTitleFromPopulation: analysis.recommendationTitleFromPopulation,
+        titleScore,
+        selectedTitleScore: automaticTitleSelection.score,
+        automaticTitleSelection,
         recommendedFocusKeywords: analysis.recommendedFocusKeywords,
-        selectedTitleSource: null,
-        selectedTitle: undefined,
+        selectedTitleSource: automaticTitleSelection.source,
+        selectedTitle: automaticTitleSelection.title,
         selectedKeywords: appliedPopulationKeywords,
-        warnings: existing.warnings,
+        confidenceScore: confidence.score,
+        confidenceLabel: confidence.label,
+        extractionCoverage: confidence.extractionCoverage,
+        engineVersion: "research-pro-v3",
+        availableCohorts: existing.availableCohorts?.length
+          ? existing.availableCohorts
+          : ["relevance"],
+        warnings: [
+          ...existing.warnings,
+          ...(confidence.label === "limited"
+            ? [populationWarning("Confidence terbatas: gunakan minimal 20 sample untuk validasi populasi yang lebih kuat.", "confidence-limited")]
+            : []),
+          ...(confidence.label === "insufficient"
+            ? [populationWarning("Sample metadata terlalu sedikit untuk rekomendasi komersial yang stabil.", "confidence-insufficient")]
+            : []),
+          ...titleScore.warnings.map((message, index) => populationWarning(message, `title-score-${index}`)),
+          ...automaticTitleSelection.score.warnings.map((message, index) => populationWarning(message, `selected-title-score-${index}`)),
+        ],
       };
       useAppStore.getState().recordGeminiUsage(analysis.usage);
       void writeDailyUsage(useAppStore.getState().dailyUsage);
       saveResearchState(readyResearch);
       addNotice(
         "success",
-        `${asset.filename}: population research selesai (${rankedSamples.filter((sample) => sample.metadataStatus === "extracted").length}/${rankedSamples.length} metadata terbaca); ${automaticallyAppliedKeywords.length} keyword population otomatis diterapkan.`,
+        `${asset.filename}: population research selesai; judul otomatis memilih ${automaticTitleSelection.source}, ${automaticallyAppliedKeywords.length} keyword population otomatis diterapkan.`,
       );
     } catch (error) {
+      recordGeminiError(error);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
       patchResearchState(asset.id, { status: "failed", warnings: [...existing.warnings, populationWarning(error instanceof Error ? error.message : String(error), "population-analysis")] }, candidate);
       addNotice("error", `Population research gagal: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -422,7 +489,11 @@ export default function App() {
     const draft = { ...current, title, assetId: selectedAsset.id };
     const validation = validateMetadata(selectedAsset.filename, draft);
     updateMetadata(selectedAsset.id, { ...draft, keywords: validation.normalizedKeywords, warnings: validation.warnings, qualityScore: qualityScore({ ...draft, keywords: validation.normalizedKeywords }, validation) });
-    patchResearchState(selectedAsset.id, { selectedTitleSource: source, selectedTitle: title });
+    patchResearchState(selectedAsset.id, {
+      selectedTitleSource: source,
+      selectedTitle: title,
+      selectedTitleScore: scorePopulationTitle(title, selectedInitialCandidate, selectedPopulationResearch.samples, selectedPopulationResearch.keywordAggregation),
+    });
   };
 
   const handleTogglePopulationKeyword = (keyword: string) => {
@@ -476,10 +547,35 @@ export default function App() {
     setApiKeyConfigured(true);
     const result = await testApiKey(value);
     setApiKeyVerified(result.connected);
-    if (!result.connected) throw new Error(result.message ?? "Gemini menolak API key ini.");
+    if (!result.connected) {
+      recordGeminiError(result.message ?? "Gemini menolak API key ini.");
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
+      throw new Error(result.message ?? "Gemini menolak API key ini.");
+    }
+    clearGeminiError();
+    void writeDailyUsage(useAppStore.getState().dailyUsage);
   };
   const removeKey = async () => { await removeApiKey(); await deleteApiKey(); setApiKeyConfigured(false); setApiKeyVerified(false); };
-  const testKey = async (value: string): Promise<ApiStatus> => { const result = await testApiKey(value || undefined); setApiKeyVerified(result.connected); if (result.connected && value.trim()) await setApiKey(value); return result; };
+  const testKey = async (value: string): Promise<ApiStatus> => {
+    try {
+      const result = await testApiKey(value || undefined);
+      setApiKeyVerified(result.connected);
+      if (!result.connected) {
+        recordGeminiError(result.message ?? "Koneksi Gemini gagal.");
+        void writeDailyUsage(useAppStore.getState().dailyUsage);
+      }
+      if (result.connected) {
+        clearGeminiError();
+        void writeDailyUsage(useAppStore.getState().dailyUsage);
+      }
+      if (result.connected && value.trim()) await setApiKey(value);
+      return result;
+    } catch (error) {
+      recordGeminiError(error);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
+      throw error;
+    }
+  };
 
   const startExport = () => {
     const issues = assets.flatMap((asset) => {
@@ -634,6 +730,7 @@ export default function App() {
         </div>
         <span className="hidden lg:inline">
           Hari ini: <b className="text-accent-700">{dailyUsage.requests} request</b> · {formatTokenCount(dailyUsage.totalTokens)} token
+          {remainingTokenBudget(dailyUsage, settings.dailyTokenBudget) !== null ? ` · sisa ${formatTokenCount(remainingTokenBudget(dailyUsage, settings.dailyTokenBudget) ?? 0)}` : ""}
         </span>
       </footer>
 

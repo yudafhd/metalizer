@@ -2,7 +2,7 @@ import { cancelGeneration, cleanupTempFile, createContactSheet, generateMetadata
 import { emptyMetadata, IDEAL_KEYWORD_MAX, IDEAL_KEYWORD_MIN, normalizeKeywords, prioritizeKeywords, qualityScore, validateMetadata } from "../utils/metadata";
 import { chunkItems } from "../utils/batching";
 import { useAppStore } from "../stores/appStore";
-import { writeDailyUsage } from "./usage";
+import { isTokenBudgetExhausted, writeDailyUsage } from "./usage";
 import type { AppSettings, AssetStatus, BatchJob, GeneratedMetadata, MetadataMode, StockAsset, StockMetadata } from "../types";
 
 const activeBatchIds = new Set<string>();
@@ -17,6 +17,10 @@ export async function runGeneration(options: { onlyFailed?: boolean; assetIds?: 
   }
   if (store.settings.modelPreset === "custom" && !store.settings.customModel.trim()) {
     store.addNotice("error", "ID model khusus masih kosong. Pilih model Gemini yang valid di Settings.");
+    return;
+  }
+  if (isTokenBudgetExhausted(store.settings, store.dailyUsage)) {
+    store.addNotice("warning", "Budget token harian lokal sudah habis. Naikkan budget atau set 0 untuk menonaktifkan pembatas.");
     return;
   }
   const candidates = store.assets.filter((asset) => {
@@ -48,6 +52,11 @@ export async function runGeneration(options: { onlyFailed?: boolean; assetIds?: 
   let cursor = 0;
   const worker = async (): Promise<void> => {
     while (!cancelRequested) {
+      const liveStore = useAppStore.getState();
+      if (isTokenBudgetExhausted(liveStore.settings, liveStore.dailyUsage)) {
+        store.addNotice("warning", "Generate dihentikan karena budget token harian lokal sudah habis.");
+        return;
+      }
       const index = cursor;
       cursor += 1;
       const job = jobs[index];
@@ -151,6 +160,10 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
     store.updateJob(job.id, { status: "queued", error: "Dibatalkan" });
   } else if (remainingAssets.length) {
     const message = lastError ?? "Gemini belum mengembalikan metadata untuk semua panel setelah tiga kali percobaan.";
+    if (lastError) {
+      store.recordGeminiError(lastError);
+      void writeDailyUsage(useAppStore.getState().dailyUsage);
+    }
     remainingAssets.forEach((asset) => store.setAssetStatus(asset.id, "failed", message));
     store.updateJob(job.id, { status: "failed", error: message });
     store.addNotice("error", `${job.id} gagal: ${message}`);

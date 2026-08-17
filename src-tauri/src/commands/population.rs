@@ -21,9 +21,10 @@ pub struct PopulationSearchProgressPayload {
 use crate::ai::population::GeminiPopulationProvider;
 use crate::errors::{command_error, AppError};
 use crate::models::{
-    AdobePopulationSearchRequest, AdobePopulationSearchResponse, InitialCandidate,
-    InitialCandidateRequest, PopulationAggregationRequest, PopulationAnalysisRequest,
-    PopulationAnalysisResponse, PopulationKeyword, PopulationRankingRequest,
+    AdobePopulationSearchRequest, AdobePopulationSearchResponse, InitialCandidateRequest,
+    InitialCandidateResponse, PopulationAggregationRequest,
+    PopulationAnalysisRequest, PopulationAnalysisResponse, PopulationKeyword,
+    PopulationRankingRequest,
 };
 use crate::population::adobe::parse_search_html;
 use crate::population::{
@@ -37,7 +38,7 @@ pub async fn analyze_initial_candidate(
     request: InitialCandidateRequest,
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<InitialCandidate, String> {
+) -> Result<InitialCandidateResponse, String> {
     crate::commands::license::require_license(&app)?;
     let api_key = api_key(&state)?;
     let cancellation_key = format!("initial:{}", request.asset_id);
@@ -65,11 +66,12 @@ pub async fn search_adobe_population(
     };
     let search_url = build_search_url(&request).map_err(command_error)?;
     let cache_key = format!(
-        "{}|{}|{}|{}",
+        "{}|{}|{}|{}|limit={}",
         request.query.trim().to_lowercase(),
         request.locale.trim().to_lowercase(),
         request.asset_type,
-        request.sort
+        request.sort,
+        request.limit
     );
     if request.sort != "relevance" {
         if let Ok(cache) = state.population_search_cache.lock() {

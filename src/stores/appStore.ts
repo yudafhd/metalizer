@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { GEMINI_MODELS } from "../constants/models";
 import type { AdobePopulationResearch, AppSettings, AssetStatus, BatchJob, DailyUsage, GenerationProgress, GeminiUsageMetadata, InitialCandidate, StockAsset } from "../types";
-import { emptyDailyUsage, todayKey, usageToDailyDelta } from "../services/usage";
+import { classifyGeminiError, emptyDailyUsage, todayKey, usageToDailyDelta } from "../services/usage";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   model: GEMINI_MODELS.balanced,
@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   concurrency: 2,
   metadataMode: "balanced",
   targetKeywords: 30,
+  dailyTokenBudget: 0,
   additionalPrompt: "",
   contactSheetQuality: 85,
   maxSheetSize: 2048,
@@ -60,6 +61,8 @@ interface AppStore {
   setApiKeyVerified: (apiKeyVerified: boolean) => void;
   setDailyUsage: (dailyUsage: DailyUsage) => void;
   recordGeminiUsage: (usage?: GeminiUsageMetadata) => void;
+  recordGeminiError: (error: unknown) => void;
+  clearGeminiError: () => void;
   setProgress: (progress: GenerationProgress) => void;
   patchProgress: (patch: Partial<GenerationProgress>) => void;
   addNotice: (tone: Notice["tone"], message: string) => void;
@@ -141,8 +144,29 @@ export const useAppStore = create<AppStore>((set) => ({
         outputTokens: state.dailyUsage.outputTokens + delta.outputTokens,
         totalTokens: state.dailyUsage.totalTokens + delta.totalTokens,
       };
-      return { dailyUsage: nextUsage };
+      return { dailyUsage: { ...nextUsage, lastErrorKind: undefined, lastErrorMessage: undefined, lastErrorAt: undefined } };
     }),
+  recordGeminiError: (error) =>
+    set((state) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        dailyUsage: {
+          ...state.dailyUsage,
+          lastErrorKind: classifyGeminiError(message),
+          lastErrorMessage: message,
+          lastErrorAt: new Date().toISOString(),
+        },
+      };
+    }),
+  clearGeminiError: () =>
+    set((state) => ({
+      dailyUsage: {
+        ...state.dailyUsage,
+        lastErrorKind: undefined,
+        lastErrorMessage: undefined,
+        lastErrorAt: undefined,
+      },
+    })),
   setProgress: (progress) => set({ progress }),
   patchProgress: (patch) => set((state) => ({ progress: { ...state.progress, ...patch } })),
   addNotice: (tone, message) => {

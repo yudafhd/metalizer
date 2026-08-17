@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AdobePopulationResearch, AdobePopulationSample, InitialCandidate } from "../types";
-import { aggregatePopulationKeywords, buildAdobeSearchUrl, isPopulationResearchStale, limitPopulationSamples, markUnavailableSample, rankPopulationSamples, selectPopulationTitle, validatePopulationQuery } from "./population";
+import { aggregatePopulationKeywords, buildAdobeSearchUrl, calculatePopulationConfidence, isPopulationResearchStale, limitPopulationSamples, markUnavailableSample, rankPopulationSamples, scorePopulationTitle, selectAutomatedPopulationTitle, selectFinalPopulationKeywords, selectPopulationTitle, validatePopulationQuery } from "./population";
 
 function sample(rank: number, assetId: string, keywords: string[], metadataStatus: AdobePopulationSample["metadataStatus"] = "extracted"): AdobePopulationSample {
   return {
@@ -92,6 +92,7 @@ describe("population research helpers", () => {
   it("marks a changed filter stale and keeps title choices independent", () => {
     const state = research();
     expect(isPopulationResearchStale(state, "capybara photo", "uk", "photo", "relevance")).toBe(true);
+    expect(isPopulationResearchStale({ ...state, sampleLimit: 5 }, "capybara icon set", "uk", "vector", "relevance", 20)).toBe(true);
     expect(selectPopulationTitle("initial", candidate, { ...state, recommendationTitleFromPopulation: "Population title" }, "Current title")).toBe(candidate.initialTitle);
     expect(selectPopulationTitle("population", candidate, { ...state, recommendationTitleFromPopulation: "Population title" }, "Current title")).toBe("Population title");
     expect(selectPopulationTitle("custom", candidate, state, "Current title")).toBe("Current title");
@@ -102,5 +103,68 @@ describe("population research helpers", () => {
     expect(unavailable.metadataStatus).toBe("unavailable");
     expect(unavailable.keywords).toEqual([]);
     expect(unavailable.title).toBeUndefined();
+  });
+
+  it("builds a supported final list with title concepts first", () => {
+    const values = aggregatePopulationKeywords(
+      [
+        sample(1, "1", ["capybara", "icon set", "black silhouette"]),
+        sample(2, "2", ["capybara", "icon set", "animal"]),
+      ],
+      candidate.visualFacts,
+    );
+    const selected = selectFinalPopulationKeywords(values, candidate.initialTitle, 35);
+    expect(selected.map((keyword) => keyword.normalizedKeyword)).toContain("capybara");
+    expect(selected.map((keyword) => keyword.normalizedKeyword)).not.toContain("rabbit");
+    expect(selected[0]?.supportedByInput).toBe(true);
+  });
+
+  it("labels small evidence sets as limited or insufficient", () => {
+    const confidence = calculatePopulationConfidence(
+      [sample(1, "1", ["capybara"])],
+      aggregatePopulationKeywords([sample(1, "1", ["capybara"])], candidate.visualFacts),
+      candidate.initialTitle,
+    );
+    expect(confidence.label).toBe("insufficient");
+    expect(confidence.extractionCoverage).toBe(1);
+  });
+
+  it("scores a title against image truth, query coverage, and originality", () => {
+    const score = scorePopulationTitle(candidate.initialTitle, candidate, [
+      sample(1, "1", ["capybara", "icon set"]),
+    ]);
+    expect(score.imageAccuracy).toBeGreaterThan(0);
+    expect(score.queryCoverage).toBe(1);
+    expect(score.total).toBeGreaterThan(0.5);
+  });
+
+  it("automatically selects the strongest compliant title and normalizes it", () => {
+    const samples = [
+      sample(1, "1", ["capybara", "icon set", "black silhouette"]),
+      sample(2, "2", ["capybara", "animal icon", "black silhouette"]),
+    ];
+    const keywords = aggregatePopulationKeywords(samples, candidate.visualFacts);
+    const selection = selectAutomatedPopulationTitle(
+      candidate,
+      '"Capybara animal icon set\nblack silhouette"',
+      samples,
+      keywords,
+    );
+    expect(selection.source).toBe("population");
+    expect(selection.title).toBe("Capybara animal icon set black silhouette");
+    expect(selection.score.populationKeywordCoverage).toBeGreaterThan(0.5);
+    expect(selection.rationale.join(" ")).toContain("skor tertinggi");
+  });
+
+  it("rejects a population title with unsupported claims in favor of image truth", () => {
+    const samples = [sample(1, "1", ["capybara", "icon set", "black silhouette"])];
+    const keywords = aggregatePopulationKeywords(samples, candidate.visualFacts);
+    const selection = selectAutomatedPopulationTitle(
+      candidate,
+      "Transparent 3D capybara icon set",
+      samples,
+      keywords,
+    );
+    expect(selection.source).toBe("initial");
   });
 });

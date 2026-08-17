@@ -57,6 +57,7 @@ export function PopulationResearchPanel({
   onApplyKeywords,
 }: PopulationResearchPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [aiResponseCopied, setAiResponseCopied] = useState(false);
 
   // Determine the furthest / naturally active step
   const naturalStep: 1 | 2 | 3 = !candidate
@@ -127,14 +128,6 @@ export function PopulationResearchPanel({
     .map((keyword) => keyword.keyword)
     .join(", ");
   const selectedTitleSource = research?.selectedTitleSource ?? null;
-  const selectedTitleLabel =
-    selectedTitleSource === "initial"
-      ? "Judul kandidat awal"
-      : selectedTitleSource === "population"
-      ? "Rekomendasi population"
-      : selectedTitleSource === "custom"
-      ? "Judul saat ini"
-      : "Belum ada pilihan";
   const selectedTitleValue =
     research?.selectedTitle?.trim() ||
     (selectedTitleSource === "initial"
@@ -590,7 +583,7 @@ export function PopulationResearchPanel({
             </div>
             <p className="mt-2 max-w-2xl text-[10px] leading-5 text-ink-secondary">
               {research?.status === "ready"
-                ? "Sintesis populasi selesai. Anda dapat memilih judul rekomendasi dan menerapkan keyword pilihan ke metadata aset."
+                ? "Sintesis populasi selesai. Sistem sudah memilih dan menerapkan judul terbaik secara otomatis; pilihan di bawah dapat dipakai sebagai override manual."
                 : "Jalankan analisis Gemini untuk menggabungkan metadata sample dan menghasilkan rekomendasi title serta ranking keyword."}
             </p>
             <button
@@ -608,42 +601,94 @@ export function PopulationResearchPanel({
           {/* Analysis Results when Ready */}
           {research?.status === "ready" ? (
             <>
-              {/* Recommendation Title Card */}
-              <div className="rounded-xl border border-accent-200 bg-accent-50/50 p-3 shadow-sm">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-accent-500">
-                  Rekomendasi judul hasil population
+              {/* Final Automated Title */}
+              <div className="rounded-xl border border-accent-300/45 bg-surface-raised p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-accent-600">
+                      <Check size={12} /> Judul final otomatis
+                    </p>
+                    <p className="mt-1 text-[12px] font-bold leading-5 text-ink">
+                      {selectedTitleValue || "Judul belum tersedia"}
+                    </p>
+                  </div>
+                  {research.automaticTitleSelection ? (
+                    <span className="shrink-0 rounded-full bg-accent-500/15 px-2 py-0.5 text-[10px] font-extrabold text-accent-600">
+                      {Math.round(research.automaticTitleSelection.score.total * 100)}%
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-[9px] leading-4 text-ink-secondary">
+                  {research.automaticTitleSelection
+                    ? `Dipilih dari ${research.automaticTitleSelection.source === "population" ? "rekomendasi population" : research.automaticTitleSelection.source === "initial" ? "kandidat awal" : "judul saat ini"} berdasarkan fakta visual dan relevansi query.`
+                    : "Judul aktif dari hasil research."}
                 </p>
-                <p className="mt-1 text-[11px] font-semibold leading-5 text-ink">
-                  {research.recommendationTitleFromPopulation || "Tidak tersedia"}
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+
+                <details className="group mt-3 rounded-lg border border-line bg-surface/70 px-2.5 py-2 text-[9px]">
+                  <summary className="cursor-pointer list-none font-bold text-ink-muted marker:hidden group-open:text-accent-600">
+                    Lihat detail penilaian
+                  </summary>
+                  <div className="mt-2 border-t border-line-subtle pt-2">
+                    {research.titleScore ? (
+                      <>
+                        <div className="flex items-center justify-between font-bold text-ink-muted">
+                          <span>Rekomendasi AI</span>
+                          <span className="text-accent-600">{Math.round(research.titleScore.total * 100)}%</span>
+                        </div>
+                        <p className="mt-1 leading-4 text-ink">
+                          {research.recommendationTitleFromPopulation || "Tidak tersedia"}
+                        </p>
+                        <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[8px] text-ink-muted sm:grid-cols-5">
+                          <span className="whitespace-nowrap">Image {Math.round(research.titleScore.imageAccuracy * 100)}%</span>
+                          <span className="whitespace-nowrap">Query {Math.round(research.titleScore.queryCoverage * 100)}%</span>
+                          <span className="whitespace-nowrap">Pop {Math.round((research.titleScore.populationKeywordCoverage ?? 0.5) * 100)}%</span>
+                          <span className="whitespace-nowrap">Buyer {Math.round(research.titleScore.buyerIntentClarity * 100)}%</span>
+                          <span className="whitespace-nowrap">Original {Math.round(research.titleScore.originality * 100)}%</span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-ink-muted">Detail skor belum tersedia.</p>
+                    )}
+                  </div>
+                </details>
+              </div>
+
+              {/* Manual Title Overrides */}
+              <div className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-ink-muted">
+                    Ganti judul manual
+                  </p>
+                  <span className="text-[8px] font-semibold text-ink-faint">opsional</span>
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button
                     type="button"
                     aria-pressed={selectedTitleSource === "initial"}
                     title="Terapkan judul yang dibuat pada Tahap 1"
                     className={`app-button min-h-10 px-2 text-[9px] leading-3 transition-all ${
                       selectedTitleSource === "initial"
-                        ? "border-accent-500 bg-accent-500/15 text-accent-500 ring-2 ring-accent-500/25"
-                        : ""
+                        ? "border-accent-500 bg-accent-500/15 text-ink ring-1 ring-accent-500/40"
+                        : "bg-surface/70 hover:border-accent-300 hover:bg-accent-500/10 hover:text-ink"
                     }`}
                     onClick={() => onChooseTitle("initial")}
                   >
                     {selectedTitleSource === "initial" ? <Check size={12} /> : null}
-                    <span>Gunakan Judul Kandidat Awal</span>
+                    <span className="text-center font-bold">Kandidat awal</span>
                   </button>
                   <button
                     type="button"
                     aria-pressed={selectedTitleSource === "population"}
                     title="Terapkan judul rekomendasi dari analisis sample population"
-                    className={`app-button app-button-primary min-h-10 px-2 text-[9px] leading-3 transition-all ${
+                    className={`app-button min-h-10 px-2 text-[9px] leading-3 transition-all ${
                       selectedTitleSource === "population"
-                        ? "ring-2 ring-accent-500/40 ring-offset-1 ring-offset-surface"
-                        : ""
+                        ? "border-accent-500 bg-accent-500/15 text-ink ring-1 ring-accent-500/40"
+                        : "bg-surface/70 hover:border-accent-300 hover:bg-accent-500/10 hover:text-ink"
                     }`}
                     onClick={() => onChooseTitle("population")}
                   >
                     {selectedTitleSource === "population" ? <Check size={12} /> : null}
-                    <span>Gunakan Rekomendasi Population</span>
+                    <span className="text-center font-bold">Population</span>
                   </button>
                   <button
                     type="button"
@@ -651,34 +696,55 @@ export function PopulationResearchPanel({
                     title="Pertahankan judul yang sedang digunakan aset"
                     className={`app-button min-h-10 px-2 text-[9px] leading-3 transition-all ${
                       selectedTitleSource === "custom"
-                        ? "border-accent-500 bg-accent-500/15 text-accent-500 ring-2 ring-accent-500/25"
-                        : ""
+                        ? "border-accent-500 bg-accent-500/15 text-ink ring-1 ring-accent-500/40"
+                        : "bg-surface/70 hover:border-accent-300 hover:bg-accent-500/10 hover:text-ink"
                     }`}
                     onClick={() => onChooseTitle("custom")}
                   >
                     {selectedTitleSource === "custom" ? <Check size={12} /> : null}
-                    <span>Pertahankan Judul Saat Ini</span>
+                    <span className="text-center font-bold">Judul saat ini</span>
                   </button>
-                </div>
-                <div className="mt-2 rounded-lg border border-line-subtle bg-surface/70 px-2.5 py-2 text-[9px]">
-                  <p className="flex items-center gap-1.5 font-semibold text-ink-muted">
-                    {selectedTitleSource ? <Check size={11} className="text-accent-500" /> : null}
-                    Pilihan aktif: <span className="text-ink">{selectedTitleLabel}</span>
-                  </p>
-                  {selectedTitleSource ? (
-                    <p
-                      className="mt-1 line-clamp-2 break-words leading-4 text-ink"
-                      title={selectedTitleValue}
-                    >
-                      <span className="font-bold text-accent-600">Judul diterapkan:</span>{" "}
-                      {selectedTitleValue || "Judul tidak tersedia"}
-                    </p>
-                  ) : null}
                 </div>
               </div>
 
               {/* Population Summary Card */}
               <div className="rounded-xl border border-line bg-surface p-3 text-[10px] shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="font-extrabold text-ink">Research Pro signal</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+                    research.confidenceLabel === "high"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : research.confidenceLabel === "medium"
+                      ? "bg-sky-100 text-sky-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {research.confidenceLabel ?? "pending"}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[9px]">
+                  <div className="rounded-lg bg-surface-sunken/60 px-2 py-1.5">
+                    <span className="block text-ink-muted">Confidence</span>
+                    <b className="text-ink">{research.confidenceScore !== undefined ? `${Math.round(research.confidenceScore * 100)}%` : "—"}</b>
+                  </div>
+                  <div className="rounded-lg bg-surface-sunken/60 px-2 py-1.5">
+                    <span className="block text-ink-muted">Extraction</span>
+                    <b className="text-ink">{research.extractionCoverage !== undefined ? `${Math.round(research.extractionCoverage * 100)}%` : `${detailSamples.filter((sample) => sample.metadataStatus === "extracted").length}/${detailSamples.length || 0}`}</b>
+                  </div>
+                  <div className="rounded-lg bg-surface-sunken/60 px-2 py-1.5">
+                    <span className="block text-ink-muted">Cohort</span>
+                    <b className="text-ink">{research.availableCohorts?.length ?? 0} tersedia</b>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {(research.availableCohorts ?? ["relevance"]).map((cohort) => (
+                    <span key={cohort} className="rounded bg-accent-50 px-1.5 py-0.5 text-[8px] font-bold text-accent-700">
+                      {cohort.replace("_", " ")}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[9px] leading-4 text-ink-muted">
+                  Skor ini adalah estimasi internal berbasis metadata publik, bukan formula ranking resmi Adobe Stock.
+                </p>
                 <p className="font-extrabold text-ink">Population summary</p>
                 <p className="mt-1 text-ink-muted">
                   Vocabulary sering:{" "}
@@ -750,8 +816,8 @@ export function PopulationResearchPanel({
                         <span className="w-16 shrink-0 text-right text-ink-muted">
                           {keyword.frequency}× · p{keyword.averageKeywordPosition}
                         </span>
-                        <span className="w-8 shrink-0 text-right font-bold text-accent-700">
-                          {keyword.populationScore}
+                        <span className="w-12 shrink-0 text-right font-bold text-accent-700" title={`Relevance ${Math.round((keyword.relevanceScore ?? 0) * 100)}% · Image ${Math.round((keyword.imageSemanticFit ?? keyword.semanticMatch) * 100)}%`}>
+                          {Math.round((keyword.finalScore ?? keyword.populationScore / 100) * 100)}%
                         </span>
                       </label>
                     ))}
@@ -782,28 +848,49 @@ export function PopulationResearchPanel({
         </div>
       ) : null}
 
-      {/* Copy Prompt Helper Button */}
-      <button
-        type="button"
-        className="app-button mt-3 h-7 w-full text-[9px]"
-        onClick={() => {
-          if (!candidate) return;
-          const text = buildPopulationChatPackage(
-            candidate,
-            research,
-            selectedStep,
-          );
-          void navigator.clipboard
-            .writeText(text)
-            .then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1800);
-            })
-            .catch(() => setCopied(false));
-        }}
-      >
-        <Clipboard size={12} /> {copyButtonLabel()}
-      </button>
+      {/* Copy Prompt / AI Response Helpers */}
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          className="app-button h-7 min-w-0 flex-1 text-[9px]"
+          onClick={() => {
+            if (!candidate) return;
+            const text = buildPopulationChatPackage(
+              candidate,
+              research,
+              selectedStep,
+            );
+            void navigator.clipboard
+              .writeText(text)
+              .then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1800);
+              })
+              .catch(() => setCopied(false));
+          }}
+        >
+          <Clipboard size={12} /> {copyButtonLabel()}
+        </button>
+        {selectedStep === 3 ? (
+          <button
+            type="button"
+            className="app-button h-7 min-w-0 flex-1 text-[9px]"
+            disabled={!research || research.status !== "ready"}
+            onClick={() => {
+              if (!research || research.status !== "ready") return;
+              void navigator.clipboard
+                .writeText(buildPopulationAiResponsePackage(research))
+                .then(() => {
+                  setAiResponseCopied(true);
+                  window.setTimeout(() => setAiResponseCopied(false), 1800);
+                })
+                .catch(() => setAiResponseCopied(false));
+            }}
+          >
+            <Sparkles size={12} /> {aiResponseCopied ? "Respons AI tersalin" : "Salin respons AI"}
+          </button>
+        ) : null}
+      </div>
 
       {/* Status info bar */}
       <div className="mt-2 flex items-center justify-between text-[9px] font-semibold text-ink-muted">
@@ -982,4 +1069,16 @@ function buildPopulationChatPackage(
   }
 
   return "";
+}
+
+function buildPopulationAiResponsePackage(research: AdobePopulationResearch): string {
+  return JSON.stringify(
+    {
+      recommendation_title_from_population:
+        research.recommendationTitleFromPopulation ?? "",
+      recommended_focus_keywords: research.recommendedFocusKeywords ?? [],
+    },
+    null,
+    2,
+  );
 }

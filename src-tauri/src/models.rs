@@ -160,6 +160,13 @@ pub struct InitialCandidate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct InitialCandidateResponse {
+    pub candidate: InitialCandidate,
+    pub usage: GeminiUsageMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InitialCandidateRequest {
     pub asset_id: String,
     pub image_path: String,
@@ -248,6 +255,12 @@ pub struct AdobePopulationSample {
     pub estimated_year: Option<u16>,
     pub date_source: Option<String>,
     pub date_confidence: u8,
+    #[serde(default)]
+    pub source_cohort: Option<String>,
+    #[serde(default)]
+    pub raw_keywords: Vec<String>,
+    #[serde(default)]
+    pub normalized_keywords: Vec<String>,
     pub metadata_status: String,
     pub extraction_error: Option<String>,
 }
@@ -275,6 +288,21 @@ pub struct PopulationKeyword {
     pub distinctiveness_adjustment: f32,
     pub population_score: f32,
     pub supported_by_input: bool,
+    pub image_semantic_fit: f32,
+    pub relevance_score: f32,
+    pub visual_neighbor_score: f32,
+    pub commercial_score: f32,
+    pub freshness_score: f32,
+    pub featured_score: f32,
+    pub undiscovered_score: f32,
+    pub position_score: f32,
+    pub top_ten_frequency: f32,
+    pub final_score: f32,
+    pub irrelevance_penalty: f32,
+    pub duplication_penalty: f32,
+    pub generic_saturation_penalty: f32,
+    pub unsupported_content_penalty: f32,
+    pub evidence_cohorts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

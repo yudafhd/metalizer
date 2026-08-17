@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { GEMINI_MODELS } from "../../constants/models";
 import type { ApiStatus, AppSettings, DailyUsage, MetadataMode } from "../../types";
-import { formatTokenCount } from "../../services/usage";
+import { formatTokenCount, remainingTokenBudget, tokenBudgetPercent } from "../../services/usage";
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -36,6 +36,8 @@ export function SettingsPanel({
   const [busy, setBusy] = useState(false);
 
   const update = (patch: Partial<AppSettings>) => onSettingsChange({ ...settings, ...patch });
+  const remainingTokens = remainingTokenBudget(dailyUsage, settings.dailyTokenBudget);
+  const budgetPercent = tokenBudgetPercent(dailyUsage, settings.dailyTokenBudget);
 
   const test = async () => {
     setBusy(true);
@@ -126,6 +128,18 @@ export function SettingsPanel({
                 </button>
               </div>
 
+              {status ? (
+                <p
+                  className={`mt-3 rounded-xl px-3 py-2.5 text-[11px] leading-5 ${
+                    status.connected
+                      ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-medium"
+                      : "bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-medium"
+                  }`}
+                >
+                  {status.message ?? (status.connected ? "Tersambung ke Gemini." : "Koneksi gagal.")}
+                </p>
+              ) : null}
+
               <div className="mt-3 flex items-center justify-between">
                 <span
                   className={`flex items-center gap-1.5 text-[11px] font-semibold ${
@@ -165,18 +179,6 @@ export function SettingsPanel({
                   ) : null}
                 </div>
               </div>
-
-              {status ? (
-                <p
-                  className={`mt-3 rounded-xl px-3 py-2.5 text-[11px] leading-5 ${
-                    status.connected
-                      ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-medium"
-                      : "bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-medium"
-                  }`}
-                >
-                  {status.message ?? (status.connected ? "Tersambung ke Gemini." : "Koneksi gagal.")}
-                </p>
-              ) : null}
             </div>
           </section>
 
@@ -193,8 +195,53 @@ export function SettingsPanel({
                 <span className="text-[11px] font-semibold text-ink-secondary">Total token hari ini</span>
                 <span className="text-[13px] font-extrabold text-accent-500">{formatTokenCount(dailyUsage.totalTokens)}</span>
               </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-accent-600">Estimasi sisa</p>
+                  <p className="mt-0.5 text-[16px] font-extrabold text-ink">
+                    {remainingTokens === null ? "—" : formatTokenCount(remainingTokens)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-accent-600">Budget lokal</p>
+                  <p className="mt-0.5 text-[16px] font-extrabold text-ink">
+                    {settings.dailyTokenBudget > 0 ? formatTokenCount(settings.dailyTokenBudget) : "Off"}
+                  </p>
+                </div>
+              </div>
+              {budgetPercent !== null ? (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-ink-muted">
+                    <span>Budget terpakai</span>
+                    <span>{budgetPercent}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line">
+                    <div
+                      className={`h-full rounded-full transition-all ${budgetPercent >= 95 ? "bg-rose-500" : budgetPercent >= 80 ? "bg-amber-500" : "bg-accent-600"}`}
+                      style={{ width: `${budgetPercent}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-3">
+                <Field label="Budget token lokal per hari (0 = tidak dibatasi)">
+                  <input
+                    className="app-input text-[13px]"
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={settings.dailyTokenBudget}
+                    onChange={(event) => update({ dailyTokenBudget: Math.max(0, Math.floor(Number(event.target.value) || 0)) })}
+                  />
+                </Field>
+              </div>
+              {dailyUsage.lastErrorKind ? (
+                <p className="mt-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-[10px] leading-4 text-amber-800">
+                  Error Gemini terakhir: <b>{dailyUsage.lastErrorKind}</b>. {dailyUsage.lastErrorMessage}
+                </p>
+              ) : null}
               <p className="mt-2.5 text-[10px] leading-4 text-ink-muted">
-                Dicatat secara lokal dari respons Gemini yang berhasil hari ini.
+                Token dicatat lokal dari respons Gemini yang berhasil. Sisa di atas adalah estimasi berdasarkan budget lokal, bukan quota server Gemini.
               </p>
             </div>
           </section>

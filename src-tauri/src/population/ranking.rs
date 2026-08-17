@@ -81,6 +81,9 @@ mod tests {
             estimated_year: None,
             date_source: None,
             date_confidence: 0,
+            source_cohort: Some("relevance".to_string()),
+            raw_keywords: Vec::new(),
+            normalized_keywords: Vec::new(),
             metadata_status: "extracted".to_string(),
             extraction_error: None,
         }

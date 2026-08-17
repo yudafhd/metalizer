@@ -13,8 +13,8 @@ use serde_json::{json, Value};
 use crate::errors::{AppError, AppResult};
 use crate::images::preprocess::{mime_type_for_path, open_image};
 use crate::models::{
-    GeminiUsageMetadata, InitialCandidate, InitialCandidateRequest, PopulationAnalysisRequest,
-    PopulationAnalysisResponse,
+    GeminiUsageMetadata, InitialCandidate, InitialCandidateRequest, InitialCandidateResponse,
+    PopulationAnalysisRequest, PopulationAnalysisResponse,
 };
 
 const MAX_URLS: usize = 20;
@@ -37,7 +37,7 @@ impl GeminiPopulationProvider {
     pub async fn analyze_initial(
         &self,
         request: &InitialCandidateRequest,
-    ) -> AppResult<InitialCandidate> {
+    ) -> AppResult<InitialCandidateResponse> {
         let (mime_type, image_data) = read_initial_candidate_image(&request.image_path)?;
         let body = json!({
             "systemInstruction": { "parts": [{ "text": initial_system_prompt() }] },
@@ -59,7 +59,7 @@ impl GeminiPopulationProvider {
             .await?;
         let wire: InitialCandidateWire = parse_structured_response(&payload)?;
         validate_initial_wire(&wire, &request.asset_id)?;
-        Ok(InitialCandidate {
+        let candidate = InitialCandidate {
             asset_id: request.asset_id.clone(),
             search_query: wire.search_query.trim().to_string(),
             search_terms: if wire.search_terms.is_empty() {
@@ -76,7 +76,14 @@ impl GeminiPopulationProvider {
             visual_style: wire.visual_style,
             category: wire.category as u8,
             confidence: wire.confidence.clamp(0.0, 1.0),
-        })
+        };
+        let usage = payload
+            .get("usageMetadata")
+            .or_else(|| payload.get("usage_metadata"))
+            .cloned()
+            .and_then(|value| serde_json::from_value::<GeminiUsageMetadata>(value).ok())
+            .unwrap_or_default();
+        Ok(InitialCandidateResponse { candidate, usage })
     }
 
     pub async fn analyze_population(

@@ -77,6 +77,7 @@ export interface AppSettings {
   concurrency: 1 | 2 | 3;
   metadataMode: MetadataMode;
   targetKeywords: number;
+  dailyTokenBudget: number;
   additionalPrompt: string;
   contactSheetQuality: number;
   maxSheetSize: number;
@@ -158,6 +159,8 @@ export interface MetadataGenerationResult {
 export type PopulationResearchStatus = "idle" | "initializing" | "searching" | "review" | "extracted" | "analyzing" | "ready" | "failed";
 export type AdobePopulationAssetType = "vector" | "illustration" | "photo" | "image";
 export type AdobePopulationSort = "relevance" | "nb_downloads" | "creation";
+export type PopulationCohort = "relevance" | "downloads" | "freshness" | "featured" | "undiscovered" | "visual_neighbors";
+export type PopulationConfidenceLabel = "high" | "medium" | "limited" | "insufficient";
 export type PopulationTitleSource = "initial" | "population" | "custom" | null;
 
 export interface InitialCandidate {
@@ -170,6 +173,11 @@ export interface InitialCandidate {
   visualStyle?: string;
   category: number;
   confidence: number;
+}
+
+export interface InitialCandidateResponse {
+  candidate: InitialCandidate;
+  usage: GeminiUsageMetadata;
 }
 
 export interface InitialCandidateRequest {
@@ -239,8 +247,46 @@ export interface AdobePopulationSample {
   estimatedYear?: number | null;
   dateSource?: string;
   dateConfidence: number;
+  sourceCohort?: PopulationCohort;
+  rawKeywords?: string[];
+  normalizedKeywords?: string[];
   metadataStatus: "extracted" | "unavailable" | "failed";
   extractionError?: string;
+}
+
+export interface PopulationKeywordEvidence {
+  imageSemanticFit: number;
+  relevanceScore: number;
+  visualNeighborScore: number;
+  commercialScore: number;
+  freshnessScore: number;
+  featuredScore: number;
+  undiscoveredScore: number;
+  positionScore: number;
+  topTenFrequency: number;
+  irrelevancePenalty: number;
+  duplicationPenalty: number;
+  genericSaturationPenalty: number;
+  unsupportedContentPenalty: number;
+  cohorts: PopulationCohort[];
+}
+
+export interface PopulationTitleScore {
+  imageAccuracy: number;
+  queryCoverage: number;
+  populationKeywordCoverage?: number;
+  samplePatternFit: number;
+  buyerIntentClarity: number;
+  originality: number;
+  total: number;
+  warnings: string[];
+}
+
+export interface PopulationTitleSelection {
+  source: Exclude<PopulationTitleSource, null>;
+  title: string;
+  score: PopulationTitleScore;
+  rationale: string[];
 }
 
 export interface PopulationKeyword {
@@ -257,6 +303,17 @@ export interface PopulationKeyword {
   distinctivenessAdjustment: number;
   populationScore: number;
   supportedByInput: boolean;
+  imageSemanticFit?: number;
+  relevanceScore?: number;
+  visualNeighborScore?: number;
+  commercialScore?: number;
+  freshnessScore?: number;
+  featuredScore?: number;
+  undiscoveredScore?: number;
+  positionScore?: number;
+  topTenFrequency?: number;
+  finalScore?: number;
+  evidence?: PopulationKeywordEvidence;
 }
 
 export interface AdobePopulationResearch {
@@ -269,14 +326,22 @@ export interface AdobePopulationResearch {
   assetType?: AdobePopulationAssetType;
   sort?: AdobePopulationSort;
   sampleLimit?: number;
+  availableCohorts?: PopulationCohort[];
   samples: AdobePopulationSample[];
   creationResults?: AdobePopulationSearchResult[];
   keywordAggregation: PopulationKeyword[];
   recommendationTitleFromPopulation?: string;
+  titleScore?: PopulationTitleScore;
+  selectedTitleScore?: PopulationTitleScore;
+  automaticTitleSelection?: PopulationTitleSelection;
   recommendedFocusKeywords?: string[];
   selectedTitleSource: PopulationTitleSource;
   selectedTitle?: string;
   selectedKeywords: string[];
+  confidenceScore?: number;
+  confidenceLabel?: PopulationConfidenceLabel;
+  extractionCoverage?: number;
+  engineVersion?: string;
   warnings: MetadataWarning[];
 }
 
@@ -312,7 +377,12 @@ export interface DailyUsage {
   promptTokens: number;
   outputTokens: number;
   totalTokens: number;
+  lastErrorKind?: GeminiErrorKind;
+  lastErrorMessage?: string;
+  lastErrorAt?: string;
 }
+
+export type GeminiErrorKind = "rate_limit_exceeded" | "quota_exceeded" | "unknown";
 
 export interface ApiStatus {
   connected: boolean;

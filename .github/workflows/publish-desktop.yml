@@ -1,4 +1,4 @@
-name: Publish desktop release
+name: Build & publish desktop release
 
 on:
   workflow_dispatch:

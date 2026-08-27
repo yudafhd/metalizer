@@ -3,8 +3,8 @@ name: Publish desktop release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - release
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -62,6 +62,16 @@ jobs:
             throw new Error(`Version mismatch: package=${packageVersion}, tauri=${tauriVersion}, cargo=${cargoVersion ?? 'missing'}`);
           }
           console.log(`Releasing v${packageVersion}`);
+
+      - name: Verify release tag
+        if: github.ref_type == 'tag'
+        shell: node {0}
+        run: |
+          const version = require('./package.json').version;
+          const expectedTag = `v${version}`;
+          if (process.env.GITHUB_REF_NAME !== expectedTag) {
+            throw new Error(`Release tag must be ${expectedTag}; received ${process.env.GITHUB_REF_NAME}.`);
+          }
 
       - name: Verify license public key
         shell: node {0}

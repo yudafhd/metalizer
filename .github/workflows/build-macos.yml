@@ -1,9 +1,6 @@
 name: Build macOS
 
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 permissions:

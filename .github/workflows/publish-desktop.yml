@@ -55,9 +55,11 @@ jobs:
         shell: node {0}
         run: |
           const fs = require('fs');
-          const packageVersion = require('./package.json').version;
-          const tauriVersion = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8')).version;
-          const cargoVersion = fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+          const path = require('path');
+          const workspace = process.env.GITHUB_WORKSPACE;
+          const packageVersion = require(path.join(workspace, 'package.json')).version;
+          const tauriVersion = JSON.parse(fs.readFileSync(path.join(workspace, 'src-tauri/tauri.conf.json'), 'utf8')).version;
+          const cargoVersion = fs.readFileSync(path.join(workspace, 'src-tauri/Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
           if (!cargoVersion || new Set([packageVersion, tauriVersion, cargoVersion]).size !== 1) {
             throw new Error(`Version mismatch: package=${packageVersion}, tauri=${tauriVersion}, cargo=${cargoVersion ?? 'missing'}`);
           }
@@ -67,7 +69,8 @@ jobs:
         if: github.ref_type == 'tag'
         shell: node {0}
         run: |
-          const version = require('./package.json').version;
+          const path = require('path');
+          const version = require(path.join(process.env.GITHUB_WORKSPACE, 'package.json')).version;
           const expectedTag = `v${version}`;
           if (process.env.GITHUB_REF_NAME !== expectedTag) {
             throw new Error(`Release tag must be ${expectedTag}; received ${process.env.GITHUB_REF_NAME}.`);

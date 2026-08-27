@@ -5,6 +5,7 @@ import { openUrl } from "../../services/tauri";
 
 
 interface TopBarProps {
+  appVersion: string;
   assetCount: number;
   canGenerate: boolean;
   isGenerating: boolean;
@@ -20,6 +21,7 @@ interface TopBarProps {
 }
 
 export function TopBar({
+  appVersion,
   assetCount,
   canGenerate,
   isGenerating,
@@ -53,7 +55,7 @@ export function TopBar({
           <div className="flex items-center gap-2">
             <h1 className="truncate text-[16px] font-extrabold leading-tight text-ink">Metalizer</h1>
             <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-accent-700">
-              v0.2.0
+              v{appVersion}
             </span>
 
           </div>

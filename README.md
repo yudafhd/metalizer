@@ -67,62 +67,52 @@ if (-not (Test-Path "..\guardian-core\Cargo.toml")) {
 }
 ```
 
-3. Buat folder key di luar project Metalizer, lalu buat keypair:
+3. Buat keypair PEM di folder `license-keys`:
 
 Linux/macOS:
 
 ```bash
-mkdir -p ../metalizer-license-keys
-cargo run --manifest-path ../guardian-core/Cargo.toml --bin licensectl -- keygen --out ../metalizer-license-keys
+npm run license:keygen
 ```
 
 Windows PowerShell:
 
 ```powershell
-New-Item -ItemType Directory -Force ..\metalizer-license-keys | Out-Null
-cargo run --manifest-path "..\guardian-core\Cargo.toml" --bin licensectl -- keygen --out "..\metalizer-license-keys"
+npm run license:keygen
 ```
 
-Hasilnya adalah `private.key` dan `public.key`. Jangan commit atau membagikan `private.key`.
+Hasilnya adalah `private.pem` dan `public.pem`. Jangan commit atau membagikan `private.pem`.
 
-4. Buat kode lisensi untuk pelanggan:
+4. Buat kode lisensi untuk pelanggan. Product code harus sama dengan `LICENSE_PRODUCT_CODE` pada `.env`:
 
 ```bash
-cargo run --manifest-path ../guardian-core/Cargo.toml --bin licensectl -- issue \
-  --private-key ../metalizer-license-keys/private.key \
-  --product metalizer \
-  --email customer@example.com \
-  --activation-days 2 \
-  --years 1
+npm run license:create -- --email customer@example.com --days 2 --years 1 --private-key ./license-keys/private.pem
 ```
 
 Windows PowerShell:
 
 ```powershell
-cargo run --manifest-path "..\guardian-core\Cargo.toml" --bin licensectl -- issue `
-  --private-key "..\metalizer-license-keys\private.key" `
-  --product metalizer `
-  --email customer@example.com `
-  --activation-days 2 `
-  --years 1
+npm run license:create -- --email customer@example.com --days 2 --years 1 --private-key .\license-keys\private.pem
 ```
 
-Salin output yang diawali `SLC1.` kepada pelanggan. Email pada kode harus sama dengan email yang digunakan saat aktivasi.
+Salin output kode kepada pelanggan. Email pada kode harus sama dengan email yang digunakan saat aktivasi.
 
 Untuk lisensi lifetime, ganti `--years 1` dengan `--perpetual`.
 
-5. Set public key sebelum membuat build aplikasi.
+5. Buat `.env` di folder project Metalizer:
 
 Linux/macOS:
 
 ```bash
-export LICENSE_PUBLIC_KEY="$(tr -d '\r\n' < ../metalizer-license-keys/public.key)"
+LICENSE_PRODUCT_CODE=metalizer
+LICENSE_PUBLIC_KEY=G_PFk34zeiSgATeg6mgEpdvzp5BzEj8KdpbdYY1drCs
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:LICENSE_PUBLIC_KEY = (Get-Content "..\metalizer-license-keys\public.key" -Raw).Trim()
+$env:LICENSE_PRODUCT_CODE = "metalizer"
+$env:LICENSE_PUBLIC_KEY = "G_PFk34zeiSgATeg6mgEpdvzp5BzEj8KdpbdYY1drCs"
 ```
 
 6. Build Metalizer dari folder project:
@@ -132,9 +122,9 @@ npm install
 npm run tauri build
 ```
 
-Environment variable tersebut harus tetap tersedia pada terminal yang menjalankan build. Hanya `public.key` yang boleh di-embed ke aplikasi; `private.key` hanya digunakan operator saat menerbitkan kode lisensi.
+Hanya public key raw yang boleh di-embed ke aplikasi; `private.pem` hanya digunakan operator saat menerbitkan kode lisensi. Saat aktivasi, aplikasi memvalidasi signature secara lokal dan menggunakan waktu terpercaya dari `time.now` bila tersedia, dengan fallback ke cache atau waktu sistem.
 
-Product ID harus tetap `metalizer`, sesuai konfigurasi aplikasi.
+Product ID default adalah `metalizer`, sesuai konfigurasi aplikasi.
 
 ## Prasyarat pengembangan
 
@@ -170,6 +160,19 @@ npm run tauri build
 ```
 
 Hasil bundle akan dibuat oleh Tauri di folder `src-tauri/target/release/bundle/`.
+
+## Rilis GitHub
+
+Build CI berjalan saat ada push ke `master` dan hanya mengunggah artifact. Untuk menerbitkan rilis, naikkan versi yang sama di `package.json`, `src-tauri/Cargo.toml`, dan `src-tauri/tauri.conf.json`, lalu push commit tersebut ke branch `release` atau jalankan workflow **Publish desktop release** secara manual.
+
+Workflow publish memverifikasi ketiga versi, membangun NSIS Windows serta DMG/app macOS Intel dan Apple Silicon, membuat tag `v<version>`, lalu membuat GitHub Release. Repository secret `LICENSE_PUBLIC_KEY` wajib berisi public key lisensi raw base64url.
+
+Metalizer juga mendukung auto-update bertanda tangan melalui `latest.json` pada GitHub Release. Tambahkan secret berikut sebelum menerbitkan rilis pertama:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: isi file lokal `updater-keys/metalizer-updater.key`.
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: opsional; kosongkan jika key dibuat tanpa password.
+
+Public key updater sudah ditanam di `src-tauri/tauri.conf.json`. Jangan commit folder `updater-keys` atau membagikan private key tersebut.
 
 ## Tutorial penggunaan
 

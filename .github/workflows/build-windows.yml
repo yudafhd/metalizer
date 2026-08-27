@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - master
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +18,7 @@ jobs:
     runs-on: windows-latest
 
     env:
+      LICENSE_PRODUCT_CODE: metalizer
       LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
 
     steps:
@@ -39,6 +38,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Test application
+        run: npm test
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Verify license public key
         shell: pwsh

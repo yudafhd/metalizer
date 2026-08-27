@@ -5,3 +5,8 @@ src-tauri/gen/
 *.hold
 *.log
 .DS_Store
+.env
+src-tauri/public.key
+license-keys/
+updater-keys/
+*.pem

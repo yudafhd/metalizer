@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Circle, CloudOff, Download, FileWarning, LoaderCircle } from "lucide-react";
+import packageJson from "../package.json";
 
 import { NoticeStack } from "./components/common/NoticeStack";
 import { GuideModal } from "./components/common/GuideModal";
@@ -12,7 +13,7 @@ import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { ThemeSheet } from "./components/settings/ThemeSheet";
 import { useAppStore } from "./stores/appStore";
 import { cancelActiveGeneration, runGeneration } from "./services/generation";
-import { activateLicense, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
+import { activateLicense, checkForAppUpdate, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
 import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
 import { formatTokenCount, readDailyUsage } from "./services/usage";
@@ -45,6 +46,8 @@ export default function App() {
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>();
   const [licenseBusy, setLicenseBusy] = useState(true);
   const [licenseError, setLicenseError] = useState<string>();
+  const [updateAvailable, setUpdateAvailable] = useState<string>();
+  const [updateBusy, setUpdateBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -80,6 +83,37 @@ export default function App() {
   }, []); // settings are intentionally loaded once at startup
 
   useEffect(() => { void getLicenseStatus().then(setLicenseStatus).catch((error) => setLicenseError(error instanceof Error ? error.message : String(error))).finally(() => setLicenseBusy(false)); }, []);
+
+  useEffect(() => {
+    if (!licenseStatus?.valid || !isTauri) return;
+    const lastCheck = Number(localStorage.getItem("metalizer-update-check") || 0);
+    if (Number.isFinite(lastCheck) && Date.now() - lastCheck < 86_400_000) return;
+    localStorage.setItem("metalizer-update-check", String(Date.now()));
+    void checkForAppUpdate().then((update) => {
+      if (update) {
+        setUpdateAvailable(update.version);
+        addNotice("info", `Update Metalizer v${update.version} tersedia. Buka Pengaturan untuk menginstal.`);
+      }
+    }).catch(() => undefined);
+  }, [licenseStatus?.valid, addNotice]);
+
+  const checkUpdates = async () => {
+    if (!isTauri) { addNotice("info", "Update aplikasi hanya tersedia di aplikasi desktop."); return; }
+    setUpdateBusy(true);
+    try {
+      const update = await checkForAppUpdate();
+      if (!update) { setUpdateAvailable(undefined); addNotice("success", "Metalizer sudah menggunakan versi terbaru."); return; }
+      setUpdateAvailable(update.version);
+      if (!window.confirm(`Update Metalizer v${update.version} tersedia. Install sekarang?`)) return;
+      await update.downloadAndInstall();
+      setUpdateAvailable(undefined);
+      addNotice("success", "Update berhasil diinstal. Tutup lalu buka ulang Metalizer.");
+    } catch (error) {
+      addNotice("error", `Gagal memeriksa update: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
 
   useEffect(() => { if (settingsHydrated) void writeSettings(settings); }, [settings, settingsHydrated]);
 
@@ -226,6 +260,7 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-muted" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
       <TopBar
+        appVersion={packageJson.version}
         assetCount={assets.length}
         canGenerate={assets.length > 0 && apiKeyVerified && !offline}
         isGenerating={isGenerating}
@@ -354,6 +389,9 @@ export default function App() {
           onSaveApiKey={saveKey}
           onDeleteApiKey={removeKey}
           onTestApiKey={testKey}
+          updateBusy={updateBusy}
+          updateAvailable={updateAvailable}
+          onCheckForUpdates={checkUpdates}
           onClose={() => setSettingsOpen(false)}
         />
       ) : null}

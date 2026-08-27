@@ -1,0 +1,100 @@
+name: Publish desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-latest
+            args: --target aarch64-apple-darwin --bundles dmg,app
+          - name: macOS Intel
+            os: macos-latest
+            args: --target x86_64-apple-darwin --bundles dmg,app
+          - name: Windows x64
+            os: windows-latest
+            args: --bundles nsis
+    runs-on: ${{ matrix.os }}
+    env:
+      LICENSE_PRODUCT_CODE: metalizer
+      LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.os, 'macos-') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Verify version consistency
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const packageVersion = require('./package.json').version;
+          const tauriVersion = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8')).version;
+          const cargoVersion = fs.readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+          if (!cargoVersion || new Set([packageVersion, tauriVersion, cargoVersion]).size !== 1) {
+            throw new Error(`Version mismatch: package=${packageVersion}, tauri=${tauriVersion}, cargo=${cargoVersion ?? 'missing'}`);
+          }
+          console.log(`Releasing v${packageVersion}`);
+
+      - name: Verify license public key
+        shell: node {0}
+        run: |
+          const value = (process.env.LICENSE_PUBLIC_KEY || '').trim();
+          if (!/^[A-Za-z0-9_-]{43}$/.test(value) || Buffer.from(value, 'base64url').length !== 32) {
+            throw new Error('LICENSE_PUBLIC_KEY must be a 32-byte raw base64url value.');
+          }
+
+      - name: Verify updater signing key
+        shell: node {0}
+        run: |
+          if (!(process.env.TAURI_SIGNING_PRIVATE_KEY || '').trim()) {
+            throw new Error('Repository secret TAURI_SIGNING_PRIVATE_KEY is not configured.');
+          }
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Test application
+        run: npm test
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build and publish GitHub Release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Metalizer v__VERSION__
+          releaseBody: Desktop installer release for Metalizer.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

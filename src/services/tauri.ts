@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { check } from "@tauri-apps/plugin-updater";
 
 import type {
   ApiStatus,
@@ -15,6 +16,11 @@ import type {
 } from "../types";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
+
+export async function checkForAppUpdate() {
+  if (!isTauri) return null;
+  return check({ timeout: 15_000 });
+}
 
 export async function invokeCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri) throw new Error("Aksi ini hanya tersedia di aplikasi desktop");

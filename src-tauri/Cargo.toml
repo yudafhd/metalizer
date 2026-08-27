@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-guardian-core = { git = "https://github.com/yudafhd/guardian-core", branch = "master" }
+guardian-core = { git = "https://github.com/yudafhd/guardian-core", rev = "db6ba26a84447baff26fdcde195afbf1aeeb8e34" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-stronghold = "2"
@@ -26,12 +26,15 @@ thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 resvg = "0.45"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 base64 = "0.22"
 csv = "1.3"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 tracing = "0.1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 
 [profile.dev.package.scrypt]
 opt-level = 3

@@ -1,4 +1,4 @@
-import { Activity, Eye, EyeOff, KeyRound, Save, ShieldCheck, Sliders, Trash2, X, Zap } from "lucide-react";
+import { Activity, Download, Eye, EyeOff, KeyRound, Save, ShieldCheck, Sliders, Trash2, X, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { GEMINI_MODELS } from "../../constants/models";
@@ -15,6 +15,9 @@ interface SettingsPanelProps {
   onSaveApiKey: (value: string) => Promise<void>;
   onDeleteApiKey: () => Promise<void>;
   onTestApiKey: (value: string) => Promise<ApiStatus>;
+  updateBusy: boolean;
+  updateAvailable?: string;
+  onCheckForUpdates: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -28,6 +31,9 @@ export function SettingsPanel({
   onSaveApiKey,
   onDeleteApiKey,
   onTestApiKey,
+  updateBusy,
+  updateAvailable,
+  onCheckForUpdates,
   onClose,
 }: SettingsPanelProps) {
   const [apiKey, setApiKey] = useState("");
@@ -102,6 +108,22 @@ export function SettingsPanel({
             </div>
           ) : null}
 
+          <section>
+            <SectionTitle icon={<Download size={15} />} title="Update aplikasi" />
+            <div className="mt-3 rounded-2xl border border-line bg-surface-sunken/40 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-bold text-ink">
+                    {updateAvailable ? `Update v${updateAvailable} tersedia` : "Periksa versi terbaru"}
+                  </p>
+                </div>
+                <button className="app-button app-button-primary shrink-0" disabled={updateBusy} onClick={() => void onCheckForUpdates()}>
+                  <Download size={14} /> {updateBusy ? "Memeriksa…" : updateAvailable ? "Install" : "Periksa"}
+                </button>
+              </div>
+            </div>
+          </section>
+
           {/* AI Connection */}
           <section>
             <SectionTitle icon={<KeyRound size={15} />} title="Koneksi Gemini AI" />
@@ -128,9 +150,8 @@ export function SettingsPanel({
 
               <div className="mt-3 flex items-center justify-between">
                 <span
-                  className={`flex items-center gap-1.5 text-[11px] font-semibold ${
-                    apiKeyVerified ? "text-emerald-500" : apiKeyConfigured ? "text-accent-500" : "text-ink-muted"
-                  }`}
+                  className={`flex items-center gap-1.5 text-[11px] font-semibold ${apiKeyVerified ? "text-emerald-500" : apiKeyConfigured ? "text-accent-500" : "text-ink-muted"
+                    }`}
                 >
                   <ShieldCheck size={14} />
                   {apiKeyVerified ? "Tersambung dan aktif" : apiKeyConfigured ? "Tersimpan, belum dicek" : "API key belum diatur"}
@@ -168,11 +189,10 @@ export function SettingsPanel({
 
               {status ? (
                 <p
-                  className={`mt-3 rounded-xl px-3 py-2.5 text-[11px] leading-5 ${
-                    status.connected
+                  className={`mt-3 rounded-xl px-3 py-2.5 text-[11px] leading-5 ${status.connected
                       ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-medium"
                       : "bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-medium"
-                  }`}
+                    }`}
                 >
                   {status.message ?? (status.connected ? "Tersambung ke Gemini." : "Koneksi gagal.")}
                 </p>
@@ -389,9 +409,8 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
         aria-pressed={value}
       >
         <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-            value ? "left-[18px]" : "left-0.5"
-          }`}
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${value ? "left-[18px]" : "left-0.5"
+            }`}
         />
       </button>
     </div>

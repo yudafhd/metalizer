@@ -59,7 +59,14 @@ jobs:
             exit 1
           fi
 
-      - name: Build Tauri application
+      - name: Build Tauri application (Apple Silicon)
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: >-
+          npm run tauri build -- --target ${{ matrix.target }} --bundles dmg,app
+          --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Build Tauri application (Intel)
+        if: matrix.target == 'x86_64-apple-darwin'
         run: npm run tauri build -- --target ${{ matrix.target }} --bundles dmg,app
 
       - name: Upload macOS bundles

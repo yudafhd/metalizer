@@ -2,7 +2,7 @@
 
 Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memvalidasi, dan mengekspor metadata gambar secara batch untuk Adobe Stock. Metalizer menggunakan Gemini untuk membuat saran `Title`, `Keywords`, dan `Category`; keputusan akhir dan pemeriksaan metadata tetap berada di tangan pengguna.
 
-> Versi saat ini: `0.2.0`
+> Versi saat ini: `0.2.1`
 
 
 ## Fitur

@@ -1,6 +1,6 @@
 [package]
 name = "adobe-stock-metadata-generator"
-version = "0.2.0"
+version = "0.2.1"
 description = "A local-first batch metadata generator for Adobe Stock contributors"
 authors = ["Yuda Fhd"]
 edition = "2021"

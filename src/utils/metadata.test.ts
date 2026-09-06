@@ -22,6 +22,7 @@ describe("batching", () => {
 describe("metadata normalization", () => {
   it("preserves priority order while removing duplicates and filenames", () => {
     expect(normalizeKeywords(["Cat", " orange  cat ", "cat", "cat-001.jpg", "pet"], "cat-001.jpg")).toEqual(["Cat", "orange cat", "pet"]);
+    expect(normalizeKeywords(["vector", "illustration.eps", "art"], "illustration.eps")).toEqual(["vector", "art"]);
   });
 
   it("removes obvious spam and trademark terms", () => {

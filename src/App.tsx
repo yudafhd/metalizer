@@ -166,7 +166,7 @@ export default function App() {
       if (!folder) return;
       const result = await scanFolder(folder);
       if (!result.paths.length) {
-        addNotice("warning", "Folder ini belum berisi gambar JPG, PNG, WebP, atau SVG yang bisa dipakai.");
+        addNotice("warning", "Folder ini belum berisi gambar JPG, PNG, WebP, SVG, atau EPS yang bisa dipakai.");
         return;
       }
       await addPaths(result.paths);
@@ -363,7 +363,7 @@ export default function App() {
         type="file"
         className="hidden"
         multiple
-        accept=".jpg,.jpeg,.png,.webp,.svg"
+        accept=".jpg,.jpeg,.png,.webp,.svg,.eps"
         onChange={(event) => {
           const paths = Array.from(event.target.files ?? []).map((file) => (file as File & { path?: string }).path).filter((path): path is string => Boolean(path));
           setIsAddingAssets(true);

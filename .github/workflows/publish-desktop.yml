@@ -111,3 +111,23 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Read published release tag
+        if: matrix.os == 'windows-latest'
+        id: release_version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Copy-Item "src-tauri/target/release/adobe-stock-metadata-generator.exe" "src-tauri/target/release/Metalizer.exe"
+
+      - name: Upload Windows portable executable
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_version.outputs.tag }}
+          files: src-tauri/target/release/Metalizer.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

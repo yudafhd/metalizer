@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, X } from "lucide-react";
+import { AlertCircle, CheckCheck, CheckCircle2, ChevronDown, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
@@ -57,6 +57,7 @@ export function MetadataTable({
   const [category, setCategory] = useState(8);
   const [keyword, setKeyword] = useState("");
   const [removeKeyword, setRemoveKeyword] = useState("");
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
   const submitAdd = () => {
     if (keyword.trim()) {
@@ -74,6 +75,7 @@ export function MetadataTable({
 
   const readyCount = assets.filter((asset) => asset.metadata).length;
   const failedCount = assets.filter((asset) => asset.status === "failed").length;
+  const completedCount = assets.filter((asset) => asset.status === "completed").length;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-panel">
@@ -108,33 +110,67 @@ export function MetadataTable({
           >
             {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <FolderOpen size={13} />} {isAddingAssets ? "Membaca..." : "Folder"}
           </button>
-          <button
-            className="app-button h-8 w-8 px-0"
-            disabled={!assets.some((asset) => asset.status === "completed")}
-            onClick={onClearCompleted}
-            title="Hapus aset selesai"
-            aria-label="Hapus aset selesai"
-          >
-            <CheckCircle2 size={14} />
-          </button>
-          <button
-            className="app-button h-8 w-8 px-0"
-            disabled={!assets.length || isGenerating}
-            onClick={onClearAll}
-            title="Hapus semua aset"
-            aria-label="Hapus semua aset"
-          >
-            <Trash2 size={14} />
-          </button>
-          <button
-            className="app-button h-8 w-8 px-0"
-            disabled={!failedCount || isGenerating}
-            onClick={onRetryFailed}
-            title={`Coba lagi${failedCount ? ` (${failedCount})` : ""}`}
-            aria-label={`Coba lagi${failedCount ? `, ${failedCount} aset gagal` : ""}`}
-          >
-            <RotateCcw size={13} />
-          </button>
+
+          {failedCount > 0 && (
+            <button
+              className="app-button h-8 px-2.5 text-[11px] font-bold border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+              disabled={isGenerating}
+              onClick={onRetryFailed}
+              title={`Coba lagi ${failedCount} gambar yang gagal`}
+            >
+              <RotateCcw size={13} /> Coba lagi ({failedCount})
+            </button>
+          )}
+
+          <div className="relative">
+            <button
+              type="button"
+              className="app-button h-8 px-2.5 text-[11px] text-ink-muted hover:text-ink transition-colors"
+              disabled={!assets.length || isGenerating}
+              onClick={() => setActionMenuOpen((open) => !open)}
+              title="Kelola & bersihkan daftar gambar"
+            >
+              <Trash2 size={13} /> Bersihkan <ChevronDown size={11} className={`transition-transform ${actionMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {actionMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setActionMenuOpen(false)} />
+                <div className="absolute right-0 top-9 z-30 w-52 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-modal">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-ink hover:bg-surface-sunken transition disabled:opacity-40 disabled:hover:bg-transparent"
+                    disabled={!completedCount}
+                    onClick={() => {
+                      onClearCompleted();
+                      setActionMenuOpen(false);
+                    }}
+                  >
+                    <CheckCheck size={14} className="text-emerald-600" />
+                    <span className="flex-1">Hapus yang selesai</span>
+                    <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-[9px] font-bold text-ink-muted">
+                      {completedCount}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-rose-600 hover:bg-rose-50 transition"
+                    onClick={() => {
+                      onClearAll();
+                      setActionMenuOpen(false);
+                    }}
+                  >
+                    <Trash2 size={14} className="text-rose-500" />
+                    <span className="flex-1">Kosongkan semua</span>
+                    <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">
+                      {assets.length}
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -152,7 +188,7 @@ export function MetadataTable({
               value={category}
               onChange={(event) => setCategory(Number(event.target.value))}
             >
-              <option value={8}>Atur kategori…</option>
+              <option value={8}>Set category…</option>
               {ADOBE_CATEGORIES.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.id} — {item.name}
@@ -225,7 +261,7 @@ export function MetadataTable({
                 <th className="px-2 py-3.5">Nama file</th>
                 <th className="min-w-[260px] px-2 py-3.5">Title</th>
                 <th className="w-32 px-2 py-3.5">Keywords</th>
-                <th className="w-36 px-2 py-3.5">Kategori</th>
+                <th className="w-36 px-2 py-3.5">Category</th>
                 <th className="w-24 px-2 py-3.5">Nilai</th>
                 <th className="w-16 px-2 py-3.5">Aksi</th>
               </tr>
@@ -355,7 +391,7 @@ function MetadataRow({
         {metadata ? (
           <>
             <span className="block truncate font-semibold text-ink">{categoryName(metadata.category)}</span>
-            <span className="mt-0.5 block text-[10px] text-ink-muted">Kategori {metadata.category}</span>
+            <span className="mt-0.5 block text-[10px] text-ink-muted">Category {metadata.category}</span>
           </>
         ) : (
           "—"
@@ -404,7 +440,7 @@ function TableEmpty({ onDrop, onChoose }: { onDrop: (event: React.DragEvent<HTML
         </div>
         <h2 className="mt-4 text-[17px] font-extrabold text-ink">Tambahkan gambar pertama</h2>
         <p className="mt-2 text-[12px] leading-6 text-ink-muted">
-          Tarik file JPG, PNG, WebP, atau SVG ke sini, atau klik tombol di bawah untuk mulai membuat metadata.
+          Tarik file JPG, PNG, WebP, SVG, atau EPS ke sini, atau klik tombol di bawah untuk mulai membuat metadata.
         </p>
         <button className="app-button app-button-primary mt-5 h-9 px-5 text-[11px]" onClick={onChoose}>
           <ImagePlus size={14} /> Pilih gambar

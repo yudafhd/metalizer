@@ -69,6 +69,7 @@ export function normalizeKeywords(raw: string[], filename: string, maximum = 49)
       lower.includes(".png") ||
       lower.includes(".webp") ||
       lower.includes(".svg") ||
+      lower.includes(".eps") ||
       isUnsafeKeyword(keyword)
     ) {
       continue;
@@ -150,6 +151,5 @@ export function emptyMetadata(asset: StockAsset, mode: StockMetadata["metadataMo
     warnings: [],
     aiGenerated: false,
     metadataMode: mode,
-    contentSource: "standard",
   };
 }

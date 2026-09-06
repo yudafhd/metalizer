@@ -8,11 +8,11 @@ Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memva
 ## Fitur
 
 - Impor banyak file atau seluruh folder secara rekursif.
-- Mendukung `JPG`, `JPEG`, `PNG`, `WebP`, dan `SVG`.
+- Mendukung `JPG`, `JPEG`, `PNG`, `WebP`, `SVG`, dan `EPS`.
 - Pemrosesan batch 1–6 gambar menggunakan contact sheet.
 - Tiga gaya pembuatan metadata: **Ketat**, **Seimbang**, dan **Eksplorasi**.
 - Pemeriksaan keyword: duplikat, keyword berisiko, urutan relevansi, dan jumlah keyword.
-- Inspector untuk mengedit title, category, keyword, dan sumber konten per gambar.
+- Inspector untuk mengedit title, category, dan keyword per gambar.
 - Bulk edit untuk mengubah kategori atau keyword beberapa gambar sekaligus.
 - Generate ulang hanya untuk title, keywords, atau seluruh metadata.
 - Nilai kualitas dan peringatan sebelum export.
@@ -228,7 +228,6 @@ Klik baris gambar untuk membuka **Inspector**. Periksa:
 - **Title**: judul singkat dan deskriptif.
 - **Keywords**: pastikan benar-benar didukung isi gambar. Sepuluh keyword pertama paling penting.
 - **Category**: pilih kategori Adobe Stock yang paling sesuai.
-- **Sumber konten**: pilih `Biasa` atau `AI generatif` sebagai penanda manual.
 - **Peringatan**: selesaikan masalah penting sebelum export.
 
 Gunakan tombol berikut bila diperlukan:

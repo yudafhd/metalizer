@@ -1,6 +1,5 @@
 export type AssetStatus = "queued" | "preparing" | "processing" | "completed" | "failed";
 export type MetadataMode = "strict" | "balanced" | "discovery";
-export type ContentSource = "standard" | "generative-ai";
 export type AppTheme =
   | "ocean"
   | "sage"
@@ -41,7 +40,6 @@ export interface StockMetadata {
   warnings: MetadataWarning[];
   aiGenerated: boolean;
   metadataMode: MetadataMode;
-  contentSource: ContentSource;
 }
 
 export interface StockAsset {

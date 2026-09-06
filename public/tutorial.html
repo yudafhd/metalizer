@@ -3,17 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panduan Penggunaan Metalizer</title>
+  <title>Panduan Penggunaan — Metalizer</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --code-bg: #0b1120;
+      --bg: #faf9f5;
+      --bg-subtle: #f2f0e9;
+      --card-bg: #ffffff;
+      --border: #e6e4dc;
+      --text: #24272c;
+      --text-muted: #575c66;
+      --text-soft: #848a94;
+      --accent-link: #1d4ed8;
+      --code-bg: #f0eee7;
+      --code-border: #e0ded6;
+      --code-color: #24272c;
+      --callout-bg: #f3f1ea;
+      --callout-border: #e0ded6;
     }
 
     * {
@@ -23,75 +28,88 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       line-height: 1.6;
-      padding: 40px 20px;
+      font-size: 14.5px;
+      -webkit-font-smoothing: antialiased;
+      padding: 48px 20px 80px;
     }
 
     .container {
-      max-width: 800px;
+      max-width: 680px;
       margin: 0 auto;
     }
 
     header {
-      margin-bottom: 40px;
+      margin-bottom: 28px;
       padding-bottom: 20px;
       border-bottom: 1px solid var(--border);
     }
 
     h1 {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
-      margin-bottom: 8px;
-      color: #fff;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0;
     }
 
-    .subtitle {
-      font-size: 15px;
-      color: var(--text-muted);
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin: 36px 0 16px;
     }
 
-    .step-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 24px;
-      margin-bottom: 24px;
-    }
-
-    .step-header {
+    .step-list {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
+      flex-direction: column;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 16px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .step-item:first-child {
+      padding-top: 0;
+    }
+
+    .step-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
     }
 
     .step-num {
-      background: var(--primary);
-      color: #fff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-soft);
+      padding-top: 2px;
+      min-width: 24px;
+    }
+
+    .step-body {
+      flex: 1;
     }
 
     h2 {
-      font-size: 18px;
+      font-size: 15.5px;
       font-weight: 600;
-      color: #fff;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+      color: var(--text);
     }
 
     p {
-      font-size: 14px;
       color: var(--text-muted);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     p:last-child {
@@ -99,63 +117,47 @@
     }
 
     ol, ul {
-      margin-left: 20px;
-      margin-bottom: 12px;
-      font-size: 14px;
+      margin: 8px 0 10px 18px;
       color: var(--text-muted);
     }
 
     li {
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
 
-    strong {
+    li strong {
       color: var(--text);
     }
 
-    .box-info {
-      background: rgba(59, 130, 246, 0.1);
-      border-left: 3px solid var(--primary);
-      padding: 12px 16px;
-      font-size: 13.5px;
-      border-radius: 0 6px 6px 0;
-      margin: 14px 0;
+    .callout {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: var(--callout-bg);
+      border: 1px solid var(--callout-border);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .box-note {
-      background: rgba(245, 158, 11, 0.1);
-      border-left: 3px solid #f59e0b;
-      padding: 12px 16px;
-      font-size: 13.5px;
-      border-radius: 0 6px 6px 0;
-      margin: 14px 0;
-      color: #fde68a;
+    .callout strong {
+      color: var(--text);
     }
 
     code {
-      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       background: var(--code-bg);
-      padding: 2px 6px;
+      border: 1px solid var(--code-border);
+      color: var(--code-color);
+      padding: 2px 5px;
       border-radius: 4px;
-      font-size: 13px;
-      color: #38bdf8;
-      border: 1px solid var(--border);
+      font-size: 12.5px;
     }
 
-    pre {
-      font-family: Consolas, Monaco, "Courier New", monospace;
-      background: var(--code-bg);
-      padding: 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #cbd5e1;
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      margin: 12px 0;
-    }
+
+
 
     a {
-      color: var(--primary);
+      color: var(--accent-link);
       text-decoration: none;
     }
 
@@ -163,35 +165,81 @@
       text-decoration: underline;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13.5px;
-      margin: 14px 0;
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    th, td {
+    .faq-item {
+      padding: 14px 16px;
+      background: var(--callout-bg);
       border: 1px solid var(--border);
-      padding: 10px 12px;
-      text-align: left;
+      border-radius: 8px;
     }
 
-    th {
-      background: #162032;
+    .faq-item h3 {
+      font-size: 13.5px;
+      font-weight: 600;
       color: var(--text);
+      margin-bottom: 4px;
     }
 
-    td {
-      color: var(--text-muted);
+    .faq-item p {
+      font-size: 13px;
+      margin-bottom: 0;
     }
 
     footer {
-      margin-top: 40px;
+      margin-top: 48px;
       padding-top: 20px;
       border-top: 1px solid var(--border);
-      text-align: center;
-      font-size: 13px;
+      font-size: 12.5px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tabs {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+      margin: 8px 0 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
     }
   </style>
 </head>
@@ -199,177 +247,137 @@
 
   <div class="container">
     <header>
-      <h1>Panduan Penggunaan Metalizer</h1>
-      <div class="subtitle">Aplikasi pembuatan metadata batch gambar untuk Adobe Stock.</div>
+      <h1>Panduan Penggunaan</h1>
     </header>
 
-    <!-- STEP 1 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">1</div>
-        <h2>Instalasi</h2>
-      </div>
-      <ol>
-        <li>Download file installer <code>Metalizer_0.2.0_x64-setup.exe</code> (Windows) atau <code>Metalizer_0.2.0_aarch64.dmg</code> (macOS).</li>
-        <li>Buka file installer dan ikuti instruksi hingga selesai.</li>
-        <li>Buka aplikasi Metalizer.</li>
+    <div class="section-label">Alur Kerja Utama</div>
 
-      </ol>
-      <div class="box-info">
-        Jika muncul notifikasi <em>"Windows protected your PC"</em>, klik <strong>More info</strong> lalu pilih <strong>Run anyway</strong>.
+    <div class="step-list">
+      <!-- 01 -->
+      <div class="step-item">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <h2>Instalasi & Aktivasi</h2>
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab-btn active" data-tab="windows" onclick="switchTab('windows')">Windows</button>
+            <button type="button" class="tab-btn" data-tab="macos" onclick="switchTab('macos')">macOS</button>
+          </div>
+
+          <div id="tab-windows" class="tab-content active">
+            <ol>
+              <li>Buka file installer Metalizer (<code>.exe</code>).</li>
+              <li>Jika muncul jendela <em>"Windows protected your PC"</em>, klik teks <strong>More info</strong> lalu pilih tombol <strong>Run anyway</strong> untuk melanjutkan proses instalasi.</li>
+              <li>Buka aplikasi Metalizer, masukkan <strong>Email</strong> pembelian dan <strong>Kode Lisensi</strong> Anda.</li>
+              <li>Klik <strong>Aktivasi</strong>. Lisensi terikat pada 1 perangkat (PC/Laptop).</li>
+            </ol>
+          </div>
+
+          <div id="tab-macos" class="tab-content">
+            <ol>
+              <li>Buka file installer Metalizer (<code>.dmg</code>), lalu seret ikon Metalizer ke folder <strong>Applications</strong>.</li>
+              <li>Buka aplikasi dari folder Applications. Jika muncul peringatan keamanan macOS saat pertama kali dibuka, buka <strong>System Settings &rarr; Privacy & Security</strong>, lalu klik <strong>Open Anyway</strong>.</li>
+              <li>Buka aplikasi Metalizer, masukkan <strong>Email</strong> pembelian dan <strong>Kode Lisensi</strong> Anda.</li>
+              <li>Klik <strong>Aktivasi</strong>. Lisensi terikat pada 1 perangkat (Mac).</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- 02 -->
+      <div class="step-item">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <h2>Setup Gemini API Key</h2>
+          <p>Metalizer menggunakan AI dari Google Gemini untuk menganalisis visual gambar (tersedia kuota gratis).</p>
+          <ol>
+            <li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> lalu buat API key baru.</li>
+            <div class="callout">
+            Panduan langkah demi langkah cara membuat API key dapat dilihat di <a href="https://www.youtube.com/results?search_query=tutorial+membuat+api+key+google+studio" target="_blank" rel="noopener">YouTube</a> atau <a href="https://www.tiktok.com/search?q=tutorial%20membuat%20api%20key%20google%20studio" target="_blank" rel="noopener">TikTok</a>.
+            </div>
+            <li>Di Metalizer, buka <strong>Settings</strong> (ikon kanan atas), masukkan API key, lalu simpan.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 03 -->
+      <div class="step-item">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <h2>Impor & Generate Metadata</h2>
+          <ol>
+            <li>Tarik gambar atau folder langsung ke Workspace (atau klik <strong>Import Folder</strong>).</li>
+            <li>Format didukung: <code>JPG</code>, <code>PNG</code>, <code>WebP</code>, dan <code>SVG</code>. File asli Anda tidak akan diubah atau ditimpa.</li>
+            <li>Klik <strong>Generate</strong>. Gambar akan segera diproses.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 04 -->
+      <div class="step-item">
+        <div class="step-num">04</div>
+        <div class="step-body">
+          <h2>Ekspor CSV</h2>
+          <p>Fitur ini menyatukan seluruh judul, kata kunci, dan kategori dari semua gambar ke dalam satu file spreadsheet (<code>.csv</code>) berstandar Adobe Stock. Tujuannya agar Anda tidak perlu mengetik metadata satu per satu di website Adobe Stock—cukup upload file CSV ini sekali saja, dan metadata puluhan hingga ratusan gambar akan otomatis terisi secara massal.</p>
+          <ol>
+            <li>Klik tombol <strong>Export CSV</strong> di pojok kanan atas.</li>
+            <li>Pilih lokasi penyimpanan di komputer Anda.</li>
+            <li>File tersimpan dalam format standar yang siap digunakan.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 05 -->
+      <div class="step-item">
+        <div class="step-num">05</div>
+        <div class="step-body">
+          <h2>Submit ke Adobe Stock</h2>
+          <ol>
+            <li>Login ke <a href="https://contributor.stock.adobe.com" target="_blank" rel="noopener">Adobe Stock Contributor Portal</a>.</li>
+            <li>Unggah file karya Anda di tab <strong>Uploaded Files</strong>.</li>
+            <li>Klik <strong>Upload CSV</strong> dan pilih file CSV yang telah diekspor oleh Metalizer.</li>
+            <li>Semua judul, keyword, dan kategori akan terisi otomatis. Centang opsi Generative AI di website jika karya dibuat dengan AI, lalu klik <strong>Submit</strong>.</li>
+          </ol>
+          <div class="callout">
+            <em>Catatan penting:</em> Nama file dan ekstensi gambar yang diunggah ke Adobe Stock harus sama persis dengan yang ada di dalam CSV agar tidak terjadi error saat pencocokan metadata.
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- STEP 2 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">2</div>
-        <h2>Aktivasi Lisensi</h2>
+    <div class="section-label">Solusi Kendala (FAQ)</div>
+
+    <div class="faq-list">
+      <div class="faq-item">
+        <h3>Error 429 / Rate Limit (Too Many Requests)</h3>
+        <p>Batas request per menit kuota gratis Gemini tercapai. Di menu <strong>Settings</strong>, turunkan <strong>Request bersamaan</strong> ke <code>1</code> dan naikkan <strong>Jumlah per batch</strong> ke <code>4</code> atau <code>6</code>. Tunggu 1 menit lalu coba lagi.</p>
       </div>
-      <p>Saat aplikasi pertama kali dibuka, masukkan data lisensi yang Anda terima saat pembelian:</p>
-      <ol>
-        <li>Masukkan <strong>Email</strong> yang digunakan saat membeli.</li>
-        <li>Masukkan <strong>Kode Lisensi</strong> (kode panjang yang diawali <code>SLC1.</code>).</li>
-        <li>Klik tombol <strong>Aktivasi</strong>.</li>
-      </ol>
-      <div class="box-note">
-        Catatan: Lisensi terikat ke 1 perangkat (PC/Laptop). Pastikan email sesuai dengan data saat transaksi.
+
+      <div class="faq-item">
+        <h3>Error "Invalid API Key"</h3>
+        <p>Pastikan API key disalin utuh dari Google AI Studio tanpa spasi tambahan di awal atau akhir.</p>
       </div>
-    </div>
 
-    <!-- STEP 3 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">3</div>
-        <h2>Setup Gemini API Key</h2>
+      <div class="faq-item">
+        <h3>Pindah Perangkat / Laptop Baru</h3>
+        <p>Lisensi terikat ke hardware ID perangkat Anda. Jika Anda mengganti perangkat kerja, hubungi tim support kami untuk reset aktivasi lisensi.</p>
       </div>
-      <p>Metalizer memerlukan Gemini API Key dari Google (tersedia kuota gratis).</p>
-      <ol>
-        <li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio (aistudio.google.com/app/apikey)</a>.</li>
-        <li>Login dengan akun Google, lalu klik <strong>Create API key</strong>.</li>
-        <li>Salin API Key yang dihasilkan.</li>
-        <li>Di aplikasi Metalizer, klik ikon <strong>Settings</strong> (kanan atas), paste API key pada kolom yang tersedia, lalu simpan.</li>
-      </ol>
-
-      <table style="margin-top: 16px;">
-        <thead>
-          <tr>
-            <th>Mode Metadata</th>
-            <th>Deskripsi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Strict (Ketat)</strong></td>
-            <td>Keyword hanya berdasarkan objek nyata yang terlihat.</td>
-          </tr>
-          <tr>
-            <td><strong>Balanced (Seimbang)</strong></td>
-            <td>Campuran objek langsung dan konsep relevan (default yang disarankan).</td>
-          </tr>
-          <tr>
-            <td><strong>Discovery (Eksplorasi)</strong></td>
-            <td>Menjangkau konsep visual lebih luas dan kata kunci turunan.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- STEP 4 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">4</div>
-        <h2>Impor Gambar</h2>
-      </div>
-      <ol>
-        <li>Tarik file gambar atau folder langsung ke dalam jendela aplikasi, atau klik tombol <strong>Import Folder</strong>.</li>
-        <li>Format yang didukung: <code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.webp</code>, dan <code>.svg</code>.</li>
-        <li>File asli di komputer tidak akan diubah atau ditimpa.</li>
-      </ol>
-    </div>
-
-    <!-- STEP 5 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">5</div>
-        <h2>Generate Metadata</h2>
-      </div>
-      <ol>
-        <li>Klik tombol <strong>Generate Metadata</strong>.</li>
-        <li>Aplikasi akan memproses gambar secara batch (membuat contact sheet hemat token).</li>
-        <li>Tunggu hingga progress bar mencapai 100%.</li>
-      </ol>
-    </div>
-
-    <!-- STEP 6 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">6</div>
-        <h2>Review & Edit</h2>
-      </div>
-      <ul>
-        <li><strong>Inspector:</strong> Klik gambar untuk melihat dan mengedit Title, Kategori, atau Keywords.</li>
-        <li><strong>Warnings:</strong> Sistem akan menandai kata berulang (duplikat) atau merk/brand yang berisiko ditolak oleh microstock.</li>
-        <li><strong>Bulk Edit:</strong> Pilih beberapa gambar sekaligus untuk mengganti kategori atau menambah keyword secara bersamaan.</li>
-      </ul>
-    </div>
-
-    <!-- STEP 7 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">7</div>
-        <h2>Ekspor CSV</h2>
-      </div>
-      <ol>
-        <li>Klik tombol <strong>Export CSV</strong>.</li>
-        <li>Pilih lokasi penyimpanan di komputer Anda.</li>
-        <li>File CSV akan tersimpan dengan format standar UTF-8 Adobe Stock:</li>
-      </ol>
-      <pre>Filename,Title,Keywords,Category
-IMG_001.jpg,"Modern coffee shop interior with wooden table","coffee shop, cafe, interior, table, espresso, lifestyle",10</pre>
-    </div>
-
-    <!-- STEP 8 -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">8</div>
-        <h2>Upload ke Adobe Stock</h2>
-      </div>
-      <ol>
-        <li>Login ke <a href="https://contributor.stock.adobe.com" target="_blank">Adobe Stock Contributor</a>.</li>
-        <li>Upload file-file gambar Anda.</li>
-        <li>Di menu <strong>Uploaded Files</strong>, klik <strong>Upload CSV</strong> dan pilih file CSV yang diekspor dari Metalizer.</li>
-        <li>Metadata akan otomatis terisi sesuai nama file. Periksa lalu klik <strong>Submit</strong>.</li>
-      </ol>
-    </div>
-
-    <!-- FAQ & TROUBLESHOOTING -->
-    <div class="step-card">
-      <div class="step-header">
-        <div class="step-num">?</div>
-        <h2>Solusi Kendala (Troubleshooting)</h2>
-      </div>
-      
-      <p><strong>1. Error 429 / Rate Limit (Too Many Requests)</strong></p>
-      <p style="margin-bottom: 16px;">
-        Kuota per menit free-tier Gemini tercapai. Buka menu <strong>Settings</strong>, atur <strong>Concurrency</strong> ke <code>1</code> dan <strong>Batch Size</strong> ke <code>4</code> atau <code>6</code>. Tunggu 1 menit lalu lanjutkan.
-      </p>
-
-      <p><strong>2. Error "Invalid API Key"</strong></p>
-      <p style="margin-bottom: 16px;">
-        Pastikan API key disalin lengkap tanpa spasi tambahan di awal/akhir pada menu Settings.
-      </p>
-
-      <p><strong>3. Ganti Perangkat / Laptop</strong></p>
-      <p>
-        Lisensi terikat pada hardware ID perangkat. Jika ingin memindahkan instalasi ke laptop baru, hubungi kontak kami untuk reset aktivasi lisensi.
-      </p>
     </div>
 
     <footer>
-      Metalizer &copy; 2026. Panduan Penggunaan.
+      <span>Metalizer &copy; 2026</span>
+      <span>Adobe Stock Metadata Generator</span>
     </footer>
   </div>
 
+  <script>
+    function switchTab(os) {
+      document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === os);
+      });
+      document.querySelectorAll('.tab-content').forEach(function(content) {
+        content.classList.toggle('active', content.id === 'tab-' + os);
+      });
+    }
+  </script>
 </body>
 </html>

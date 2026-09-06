@@ -2,7 +2,7 @@ import { Clipboard, FileImage, Plus, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
-import type { ContentSource, MetadataMode, StockAsset, StockMetadata } from "../../types";
+import type { MetadataMode, StockAsset, StockMetadata } from "../../types";
 import { emptyMetadata, qualityScore, validateMetadata } from "../../utils/metadata";
 
 interface InspectorProps {
@@ -29,7 +29,7 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
             </div>
             <p className="eyebrow mt-4">Inspector</p>
             <p className="mt-2 text-[12px] leading-6 text-ink-muted">
-              Pilih baris aset di Workspace untuk mengedit title, kategori, dan keyword prioritas.
+              Pilih baris aset di Workspace untuk mengedit title, category, dan keyword prioritas.
             </p>
           </div>
         </div>
@@ -109,19 +109,19 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
 
         <label className="block">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] font-extrabold text-ink">Title</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="text-[11px] font-bold text-accent-600 hover:text-accent-800 transition-colors"
-                onClick={() => copy(metadata.title)}
-              >
-                Salin
-              </button>
-              <span className={`text-[10px] font-semibold ${metadata.title.length > 70 ? "text-rose-600" : "text-ink-muted"}`}>
+            <div>
+              <span className="text-[12px] font-extrabold text-ink">Title</span>
+              <span className={`ml-2 text-[10px] font-medium ${metadata.title.length > 70 ? "text-rose-600 font-semibold" : "text-ink-muted"}`}>
                 {metadata.title.length}/70
               </span>
             </div>
+            <button
+              type="button"
+              className="app-button app-button-quiet h-7 px-2 text-[10px]"
+              onClick={() => copy(metadata.title)}
+            >
+              <Clipboard size={12} /> Salin
+            </button>
           </div>
           <input
             className="app-input mt-2 text-[12px]"
@@ -132,7 +132,7 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
         </label>
 
         <div className="mt-4">
-          <label className="text-[12px] font-extrabold text-ink">Kategori</label>
+          <label className="text-[12px] font-extrabold text-ink">Category</label>
           <select
             className="app-select mt-2 text-[12px]"
             value={metadata.category}
@@ -205,21 +205,6 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
               <Plus size={15} />
             </button>
           </div>
-        </div>
-
-        <div className="mt-4">
-          <label className="text-[12px] font-extrabold text-ink">Sumber konten</label>
-          <select
-            className="app-select mt-2 text-[12px]"
-            value={metadata.contentSource}
-            onChange={(event) => commit({ contentSource: event.target.value as ContentSource })}
-          >
-            <option value="standard">Biasa (Foto / Ilustrasi Vektor)</option>
-            <option value="generative-ai">AI generatif</option>
-          </select>
-          <p className="mt-1 text-[10px] leading-4 text-ink-muted">
-            Ini penanda manual dari Anda untuk keperluan pelaporan Adobe Stock.
-          </p>
         </div>
 
         <button

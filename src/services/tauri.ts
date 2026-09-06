@@ -31,7 +31,7 @@ export async function chooseImages(): Promise<string[]> {
   const selected = await open({
     multiple: true,
     directory: false,
-    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "svg"] }],
+    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps"] }],
   });
   if (!selected) return [];
   return Array.isArray(selected) ? selected : [selected];

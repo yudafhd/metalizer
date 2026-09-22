@@ -70,6 +70,10 @@ export function normalizeKeywords(raw: string[], filename: string, maximum = 49)
       lower.includes(".webp") ||
       lower.includes(".svg") ||
       lower.includes(".eps") ||
+      lower.includes(".mp4") ||
+      lower.includes(".mov") ||
+      lower.includes(".webm") ||
+      lower.includes(".m4v") ||
       isUnsafeKeyword(keyword)
     ) {
       continue;

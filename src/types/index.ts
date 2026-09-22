@@ -51,6 +51,9 @@ export interface StockAsset {
   height: number;
   fileSize: number;
   previewUrl?: string;
+  mediaType?: "image" | "video";
+  duration?: number;
+  storyboardPath?: string;
   batchId?: string;
   status: AssetStatus;
   metadata?: StockMetadata;
@@ -101,6 +104,8 @@ export interface AssetDescriptor {
   height: number;
   fileSize: number;
   previewUrl?: string;
+  mediaType?: "image" | "video";
+  duration?: number;
 }
 
 export interface ContactSheetAsset {

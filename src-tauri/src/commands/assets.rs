@@ -78,12 +78,8 @@ fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
         let Ok(metadata) = fs::metadata(&normalized) else {
             continue;
         };
-        let Ok((width, height)) = read_dimensions(Path::new(&normalized)) else {
-            continue;
-        };
-        let Ok(preview_url) = preview_data_url(Path::new(&normalized)) else {
-            continue;
-        };
+        let (width, height) = read_dimensions(Path::new(&normalized)).unwrap_or((0, 0));
+        let preview_url = preview_data_url(Path::new(&normalized)).ok();
         let Some(filename) = Path::new(&normalized).file_name().and_then(|value| value.to_str()) else {
             continue;
         };
@@ -95,7 +91,7 @@ fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
             width,
             height,
             file_size: metadata.len(),
-            preview_url: Some(preview_url),
+            preview_url,
         });
     }
     Ok(assets)

@@ -58,6 +58,7 @@ pub fn run() {
             commands::metadata::calculate_quality_score,
             commands::export::export_csv_file,
             commands::settings::cleanup_temp_file,
+            commands::settings::save_temp_image,
             commands::settings::open_url,
             commands::license::license_status,
             commands::license::activate_license,

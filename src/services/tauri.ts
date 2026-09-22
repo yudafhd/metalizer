@@ -31,10 +31,18 @@ export async function chooseImages(): Promise<string[]> {
   const selected = await open({
     multiple: true,
     directory: false,
-    filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps"] }],
+    filters: [
+      { name: "Media (Gambar & Video)", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps", "mp4", "mov", "webm", "m4v"] },
+      { name: "Gambar", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps"] },
+      { name: "Video", extensions: ["mp4", "mov", "webm", "m4v"] },
+    ],
   });
   if (!selected) return [];
   return Array.isArray(selected) ? selected : [selected];
+}
+
+export function saveTempImage(base64Data: string, filename: string): Promise<string> {
+  return invokeCommand("save_temp_image", { base64Data, filename });
 }
 
 export async function chooseFolder(): Promise<string | null> {

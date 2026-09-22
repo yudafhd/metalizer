@@ -1,4 +1,5 @@
-import { cancelGeneration, cleanupTempFile, createContactSheet, generateMetadata } from "./tauri";
+import { cancelGeneration, cleanupTempFile, createContactSheet, generateMetadata, saveTempImage } from "./tauri";
+import { extractVideoMetadataAndStoryboard, isVideoMime, isVideoPath } from "./video";
 import { emptyMetadata, IDEAL_KEYWORD_MAX, IDEAL_KEYWORD_MIN, normalizeKeywords, prioritizeKeywords, qualityScore, validateMetadata } from "../utils/metadata";
 import { chunkItems } from "../utils/batching";
 import { useAppStore } from "../stores/appStore";
@@ -86,11 +87,43 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
     remainingAssets.forEach((asset) => store.setAssetStatus(asset.id, partialAttempt === 1 ? "preparing" : "processing"));
     store.updateJob(job.id, { status: "processing", attempt: partialAttempt });
     store.patchProgress({ processing: countProcessingAssets(), currentBatch: requestBatchId });
-    const panelAssets = remainingAssets.map((asset, index) => ({
-      panelId: String(index + 1).padStart(2, "0"),
-      path: asset.path,
-      filename: asset.filename,
-    }));
+    const panelAssets = await Promise.all(
+      remainingAssets.map(async (asset, index) => {
+        const panelId = String(index + 1).padStart(2, "0");
+        const isVideo = asset.mediaType === "video" || isVideoMime(asset.mimeType) || isVideoPath(asset.path);
+
+        let pathForSheet = asset.path;
+        if (isVideo) {
+          try {
+            let storyboardPath = asset.storyboardPath;
+            if (!storyboardPath) {
+              const videoMeta = await extractVideoMetadataAndStoryboard(asset.path);
+              storyboardPath = await saveTempImage(
+                videoMeta.storyboardDataUrl,
+                `storyboard-${asset.id}-${Date.now()}.jpg`,
+              );
+              store.patchAsset(asset.id, {
+                storyboardPath,
+                previewUrl: videoMeta.thumbnailUrl,
+                width: videoMeta.width,
+                height: videoMeta.height,
+                duration: videoMeta.duration,
+                mediaType: "video",
+              });
+            }
+            pathForSheet = storyboardPath;
+          } catch (err) {
+            console.error(`Failed to extract storyboard for ${asset.filename}:`, err);
+          }
+        }
+
+        return {
+          panelId,
+          path: pathForSheet,
+          filename: isVideo ? `${asset.filename} [VIDEO STORYBOARD]` : asset.filename,
+        };
+      }),
+    );
     let contactSheetPath: string | undefined;
     try {
       const sheet = await createContactSheet({

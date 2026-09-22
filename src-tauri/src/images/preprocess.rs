@@ -9,6 +9,16 @@ use resvg::{tiny_skia, usvg};
 
 use crate::errors::{AppError, AppResult};
 
+pub fn is_video(path: &Path) -> bool {
+    let Some(extension) = path.extension().and_then(|ext| ext.to_str()) else {
+        return false;
+    };
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "mp4" | "mov" | "webm" | "m4v"
+    )
+}
+
 pub fn mime_type_for_path(path: &Path) -> Option<&'static str> {
     match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
         "jpg" | "jpeg" => Some("image/jpeg"),
@@ -16,11 +26,17 @@ pub fn mime_type_for_path(path: &Path) -> Option<&'static str> {
         "webp" => Some("image/webp"),
         "svg" => Some("image/svg+xml"),
         "eps" => Some("application/postscript"),
+        "mp4" | "m4v" => Some("video/mp4"),
+        "mov" => Some("video/quicktime"),
+        "webm" => Some("video/webm"),
         _ => None,
     }
 }
 
 pub fn read_dimensions(path: &Path) -> AppResult<(u32, u32)> {
+    if is_video(path) {
+        return Ok((0, 0));
+    }
     if is_svg(path) {
         let tree = parse_svg(path)?;
         return Ok((
@@ -45,6 +61,9 @@ pub fn open_image(path: &Path) -> AppResult<DynamicImage> {
 }
 
 pub fn preview_data_url(path: &Path) -> AppResult<String> {
+    if is_video(path) {
+        return Err(AppError::InvalidRequest("Video preview is generated on frontend".to_string()));
+    }
     let image = open_image(path)?;
     let preview = image.thumbnail(320, 220).to_rgb8();
     let mut bytes = Vec::new();

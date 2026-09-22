@@ -1,9 +1,11 @@
 import { Clipboard, FileImage, Plus, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
 import type { MetadataMode, StockAsset, StockMetadata } from "../../types";
 import { emptyMetadata, qualityScore, validateMetadata } from "../../utils/metadata";
+import { formatDuration, isVideoMime, isVideoPath } from "../../services/video";
 
 interface InspectorProps {
   asset?: StockAsset;
@@ -86,7 +88,14 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken/20 p-5">
         <div className="flex h-[176px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-sunken p-2 shadow-sm">
-          {asset.previewUrl ? (
+          {asset.mediaType === "video" || isVideoMime(asset.mimeType) || isVideoPath(asset.path) ? (
+            <video
+              src={convertFileSrc(asset.path)}
+              controls
+              poster={asset.previewUrl}
+              className="max-h-full max-w-full rounded-lg object-contain"
+            />
+          ) : asset.previewUrl ? (
             <img src={asset.previewUrl} alt={asset.filename} className="max-h-full max-w-full object-contain" />
           ) : (
             <FileImage size={28} className="text-accent-300" />
@@ -96,10 +105,11 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
         <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-3 shadow-sm">
           <div>
             <p className="text-[12px] font-extrabold text-ink">
-              {asset.width} × {asset.height}
+              {asset.width > 0 ? `${asset.width} × ${asset.height}` : "Video"}
+              {asset.duration ? ` · ${formatDuration(asset.duration)}` : ""}
             </p>
             <p className="mt-0.5 text-[10px] font-medium text-ink-muted">
-              {formatBytes(asset.fileSize)} · {asset.mimeType.replace("image/", "").toUpperCase()}
+              {formatBytes(asset.fileSize)} · {asset.mimeType.replace(/^(image|video)\//, "").toUpperCase()}
             </p>
           </div>
           <ScoreBadge score={metadata.qualityScore} />

@@ -18,6 +18,7 @@ import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
 import { formatTokenCount, readDailyUsage } from "./services/usage";
 import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata";
+import { extractVideoMetadataAndStoryboard, isVideoMime, isVideoPath } from "./services/video";
 import { serializeAdobeCsv } from "./utils/csv";
 import type { ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
 
@@ -140,10 +141,34 @@ export default function App() {
       const freshPaths = paths.filter((path) => !existing.has(path));
       if (!freshPaths.length) { addNotice("info", "Gambar itu sudah ada di antrean."); return; }
       const descriptors = await inspectAssets(freshPaths);
-      const nextAssets: StockAsset[] = descriptors.map((descriptor) => ({ ...descriptor, status: "queued" }));
+      const nextAssets: StockAsset[] = descriptors.map((descriptor) => {
+        const isVideo = isVideoMime(descriptor.mimeType) || isVideoPath(descriptor.path);
+        return {
+          ...descriptor,
+          status: "queued",
+          mediaType: isVideo ? "video" : "image",
+        };
+      });
       addAssets(nextAssets);
       if (descriptors.length < freshPaths.length) addNotice("warning", `${freshPaths.length - descriptors.length} file yang tidak didukung atau rusak dilewati.`);
       if (nextAssets.length && !selectedAssetId) setSelectedAssetId(nextAssets[0]?.id);
+
+      // Asynchronously extract video metadata and thumbnail for newly added videos
+      nextAssets
+        .filter((asset) => asset.mediaType === "video")
+        .forEach(async (videoAsset) => {
+          try {
+            const meta = await extractVideoMetadataAndStoryboard(videoAsset.path);
+            useAppStore.getState().patchAsset(videoAsset.id, {
+              width: meta.width,
+              height: meta.height,
+              duration: meta.duration,
+              previewUrl: meta.thumbnailUrl,
+            });
+          } catch (err) {
+            console.error(`Gagal memuat video preview untuk ${videoAsset.filename}:`, err);
+          }
+        });
     } catch (error) {
       addNotice("error", error instanceof Error ? error.message : String(error));
     }

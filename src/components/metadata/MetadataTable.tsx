@@ -1,10 +1,11 @@
-import { AlertCircle, CheckCheck, CheckCircle2, ChevronDown, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, X } from "lucide-react";
+import { AlertCircle, CheckCheck, CheckCircle2, ChevronDown, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, Video, X } from "lucide-react";
 import { useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
 import { AdditionalPromptBar } from "./AdditionalPromptBar";
 import type { StockAsset } from "../../types";
 import { metadataLabel } from "../../utils/metadata";
+import { formatDuration } from "../../services/video";
 
 interface MetadataTableProps {
   assets: StockAsset[];
@@ -343,9 +344,16 @@ function MetadataRow({
         >
           {asset.previewUrl ? (
             <img src={asset.previewUrl} alt="" className="h-full w-full object-contain" />
+          ) : asset.mediaType === "video" ? (
+            <Video size={16} className="text-accent-400" />
           ) : (
             <FileImage size={16} className="text-accent-400" />
           )}
+          {asset.mediaType === "video" ? (
+            <span className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1 text-[7px] font-bold text-white backdrop-blur-[1px]">
+              {asset.duration ? formatDuration(asset.duration) : "VIDEO"}
+            </span>
+          ) : null}
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-ink/40 backdrop-blur-[1px]">
               <LoaderCircle size={17} className="animate-spin text-white" />
@@ -363,7 +371,7 @@ function MetadataRow({
           {asset.filename}
         </p>
         <p className="mt-0.5 text-[10px] font-medium text-ink-muted">
-          {asset.width} × {asset.height}
+          {asset.width > 0 ? `${asset.width} × ${asset.height}` : "Video"}
         </p>
       </td>
       <td className="max-w-[290px] px-2 py-3.5">

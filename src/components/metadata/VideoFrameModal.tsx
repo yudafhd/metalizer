@@ -10,6 +10,16 @@ interface SelectedFrame {
   imageUrl: string;
 }
 
+const FRAME_INTERVALS = [20, 30, 40] as const;
+
+function intervalFrameTimes(duration: number, intervalPercent: number): number[] {
+  const count = Math.min(MAX_VIDEO_FRAMES, Math.floor(100 / intervalPercent));
+  const times = Array.from({ length: count }, (_, index) =>
+    Math.min(duration * intervalPercent * (index + 1) / 100, Math.max(0, duration - 0.05)),
+  );
+  return times.filter((time, index) => index === 0 || time - times[index - 1] >= 0.05);
+}
+
 interface Props {
   asset: StockAsset;
   onClose: () => void;
@@ -20,11 +30,15 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(asset.duration ?? 0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [frames, setFrames] = useState<SelectedFrame[]>([]);
-  const [coverTime, setCoverTime] = useState<number>();
+  const [frames, setFrames] = useState<SelectedFrame[]>(() => asset.videoFramePreviews?.slice(0, MAX_VIDEO_FRAMES) ?? []);
+  const [coverTime, setCoverTime] = useState<number | undefined>(() => asset.videoCoverTime ?? asset.videoFramePreviews?.[0]?.time);
   const [busy, setBusy] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
   const [seeking, setSeeking] = useState(false);
   const [loadingFrames, setLoadingFrames] = useState(false);
+  const [selectedInterval, setSelectedInterval] = useState<number>();
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; interval: number } | null>(null);
+  const batchSelectingRef = useRef(false);
   const [error, setError] = useState<string>();
 
   const handleLoaded = async () => {
@@ -32,7 +46,7 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
     if (!video) return;
     setDuration(video.duration);
     const savedTimes = asset.videoFrameTimes ?? [];
-    if (!savedTimes.length) return;
+    if (!savedTimes.length || asset.videoFramePreviews?.length) return;
     setLoadingFrames(true);
     try {
       const restored: SelectedFrame[] = [];
@@ -62,14 +76,41 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
       const next = [...frames, { time, imageUrl: captureVideoFrame(video) }].sort((a, b) => a.time - b.time);
       setFrames(next);
       setCoverTime((current) => current ?? next[0].time);
+      setSelectedInterval(undefined);
       setError(undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
 
+  const applyInterval = async (intervalPercent: number) => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(duration) || duration <= 0 || batchSelectingRef.current) return;
+    const times = intervalFrameTimes(duration, intervalPercent);
+    batchSelectingRef.current = true;
+    setError(undefined);
+    try {
+      video.pause();
+      const selected: SelectedFrame[] = [];
+      for (const [index, time] of times.entries()) {
+        setBatchProgress({ current: index + 1, total: times.length, interval: intervalPercent });
+        await seekToTime(video, time);
+        selected.push({ time: video.currentTime, imageUrl: captureVideoFrame(video) });
+      }
+      setFrames(selected);
+      setCoverTime((current) => selected.find((frame) => Math.abs(frame.time - (current ?? -1)) < 0.5)?.time ?? selected[0].time);
+      setCurrentTime(video.currentTime);
+      setSelectedInterval(intervalPercent);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      batchSelectingRef.current = false;
+      setBatchProgress(null);
+    }
+  };
+
   const save = async () => {
-    if (!frames.length || coverTime === undefined) return;
+    if (!frames.length || coverTime === undefined || batchSelectingRef.current) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -94,23 +135,32 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
         </div>
 
         <div className="overflow-y-auto p-5">
-          <p className="mb-3 text-[12px] leading-5 text-ink-secondary">Geser video ke titik yang diinginkan, lalu pilih <b>Ambil gambar</b>. Pilih gambar utama untuk thumbnail. Semua gambar terpilih dipakai AI saat membuat metadata.</p>
-          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-xl bg-black">
+          <p className="mb-3 text-[12px] leading-5 text-ink-secondary">Pilih jarak antar titik untuk mengambil gambar otomatis, atau geser video untuk memilih manual. Klik gambar terpilih untuk menjadikannya thumbnail utama.</p>
+          <div className="relative flex h-[300px] items-center justify-center overflow-hidden rounded-xl bg-black">
             <video
               ref={videoRef}
               src={convertFileSrc(asset.path)}
               crossOrigin="anonymous"
               controls
-              preload="auto"
+              preload="metadata"
               playsInline
               poster={asset.previewUrl}
               className="h-full max-w-full object-contain"
               onLoadedMetadata={() => void handleLoaded()}
+              onLoadedData={() => setVideoLoading(false)}
+              onWaiting={() => setVideoLoading(true)}
+              onCanPlay={() => setVideoLoading(false)}
               onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-              onSeeking={() => setSeeking(true)}
-              onSeeked={() => setSeeking(false)}
-              onError={() => setError("Video tidak dapat dibuka. Periksa format, codec, atau akses file.")}
+              onSeeking={() => { setSeeking(true); setVideoLoading(true); }}
+              onSeeked={() => { setSeeking(false); setVideoLoading(false); }}
+              onError={() => { setVideoLoading(false); setError("Video tidak dapat dibuka. Periksa format, codec, atau akses file."); }}
             />
+            {videoLoading ? (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 text-white" role="status">
+                <LoaderCircle size={24} className="animate-spin" />
+                <span className="text-[11px] font-semibold">Memuat video...</span>
+              </div>
+            ) : null}
           </div>
           <div className="mt-3 flex items-center gap-3">
             <span className="w-11 text-[11px] font-bold tabular-nums text-ink">{formatDuration(currentTime)}</span>
@@ -120,7 +170,7 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
               max={Math.max(0, duration - 0.05)}
               step={0.1}
               value={Math.min(currentTime, Math.max(0, duration - 0.05))}
-              disabled={!duration || loadingFrames || busy}
+              disabled={!duration || loadingFrames || busy || batchProgress !== null}
               onChange={(event) => {
                 const time = Number(event.target.value);
                 if (videoRef.current) videoRef.current.currentTime = time;
@@ -131,7 +181,32 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
             />
             <span className="w-11 text-right text-[11px] font-bold tabular-nums text-ink-muted">{formatDuration(duration)}</span>
           </div>
-          <button type="button" className="app-button app-button-primary mt-3 w-full" onClick={addFrame} disabled={!duration || loadingFrames || busy || seeking || frames.length >= MAX_VIDEO_FRAMES}>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-[11px] font-extrabold text-ink">Jarak antar titik gambar</h3>
+              <span className="text-[10px] text-ink-muted">Maksimal {MAX_VIDEO_FRAMES} titik</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {FRAME_INTERVALS.map((interval) => (
+                <button
+                  key={interval}
+                  type="button"
+                  className={`app-button h-11 min-w-0 ${selectedInterval === interval ? "app-button-primary" : ""}`}
+                  onClick={() => void applyInterval(interval)}
+                  disabled={!duration || videoLoading || loadingFrames || busy || seeking || batchProgress !== null}
+                  aria-label={`Ambil gambar otomatis setiap ${interval} persen durasi video`}
+                  aria-pressed={selectedInterval === interval}
+                >
+                  {batchProgress?.interval === interval ? <LoaderCircle size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                  {interval}%
+                  <span className="text-[10px] opacity-70">{Math.min(MAX_VIDEO_FRAMES, Math.floor(100 / interval))} gambar</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] text-ink-muted">Video 10 detik + 20%: ambil di detik 2, 4, 6, 8, dan mendekati 10. Pilihan ini mengganti gambar terpilih.</p>
+            {batchProgress ? <p className="mt-1 text-[10px] font-semibold text-accent-500" role="status">Mengambil gambar {batchProgress.current}/{batchProgress.total}...</p> : null}
+          </div>
+          <button type="button" className="app-button app-button-primary mt-3 w-full" onClick={addFrame} disabled={!duration || loadingFrames || busy || seeking || batchProgress !== null || frames.length >= MAX_VIDEO_FRAMES}>
             {loadingFrames ? <LoaderCircle size={14} className="animate-spin" /> : <ImagePlus size={14} />}
             Ambil gambar di {formatDuration(currentTime)}
           </button>
@@ -146,13 +221,15 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
                 <div key={frame.time} className={`overflow-hidden rounded-xl border ${coverTime === frame.time ? "border-accent-500" : "border-line"}`}>
                   <button type="button" className="relative block w-full bg-surface-sunken" onClick={() => setCoverTime(frame.time)} aria-label={`Jadikan gambar pada ${formatDuration(frame.time)} gambar utama`} aria-pressed={coverTime === frame.time}>
                     <img src={frame.imageUrl} alt={`Frame ${formatDuration(frame.time)}`} className="aspect-video w-full object-contain" />
+                    <span className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-white">{duration > 0 ? Math.round(frame.time / duration * 100) : 0}%</span>
                     {coverTime === frame.time ? <span className="absolute bottom-1 left-1 rounded bg-accent-600 px-1.5 py-0.5 text-[9px] font-bold text-white">Gambar utama</span> : null}
                   </button>
                   <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-[10px] font-bold tabular-nums text-ink">{formatDuration(frame.time)}</span>
-                    <button type="button" className="text-[10px] font-semibold text-rose-500 hover:underline" onClick={() => {
+                    <button type="button" className="text-[10px] font-semibold text-rose-500 hover:underline" disabled={batchProgress !== null || busy} onClick={() => {
                       const next = frames.filter((item) => item.time !== frame.time);
                       setFrames(next);
+                      setSelectedInterval(undefined);
                       if (coverTime === frame.time) setCoverTime(next[0]?.time);
                     }} aria-label={`Hapus frame ${formatDuration(frame.time)}`}>Hapus</button>
                   </div>
@@ -165,7 +242,7 @@ export function VideoFrameModal({ asset, onClose, onSave }: Props) {
 
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
           <button type="button" className="app-button" onClick={onClose} disabled={busy}>Batal</button>
-          <button type="button" className="app-button app-button-primary" onClick={() => void save()} disabled={!frames.length || busy || loadingFrames}>
+          <button type="button" className="app-button app-button-primary" onClick={() => void save()} disabled={!frames.length || busy || loadingFrames || batchProgress !== null}>
             {busy ? <LoaderCircle size={14} className="animate-spin" /> : <Check size={14} />}
             Simpan {frames.length} gambar
           </button>

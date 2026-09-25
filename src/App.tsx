@@ -15,7 +15,7 @@ import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { ThemeSheet } from "./components/settings/ThemeSheet";
 import { useAppStore } from "./stores/appStore";
 import { cancelActiveGeneration, runGeneration } from "./services/generation";
-import { activateLicense, checkForAppUpdate, cleanupTempFile, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, saveTempImage, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
+import { activateLicense, checkForAppUpdate, cleanupTempFile, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, saveTempImage, scanFolder, setApiKey, testApiKey, chooseFolder, chooseAssets, chooseCsvOutput } from "./services/tauri";
 import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
 import { fetchDiscover, readSeenDiscoverIds, writeSeenDiscoverIds } from "./services/discover";
@@ -25,7 +25,7 @@ import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata"
 import { extractVideoMetadataAndStoryboard, isVideoMime, isVideoPath } from "./services/video";
 import { serializeCsv } from "./utils/csv";
 import { EXPORT_PLATFORMS, suggestShutterstockCategory } from "./constants/exportPlatforms";
-import type { ApiStatus, CsvExportPlatform, CsvExportRequest, CsvExportRow, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
+import type { ApiStatus, AssetMediaType, CsvExportPlatform, CsvExportRequest, CsvExportRow, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
 
 export default function App() {
   const assets = useAppStore((state) => state.assets);
@@ -57,6 +57,9 @@ export default function App() {
   const [licenseError, setLicenseError] = useState<string>();
   const [updateAvailable, setUpdateAvailable] = useState<string>();
   const [updateBusy, setUpdateBusy] = useState(false);
+  const updateCheckPromiseRef = useRef<ReturnType<typeof checkForAppUpdate> | null>(null);
+  const announcedUpdateVersionRef = useRef<string | undefined>(undefined);
+  const installedUpdateVersionRef = useRef<string | undefined>(undefined);
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [discoverItems, setDiscoverItems] = useState<DiscoverItem[]>([]);
   const [discoverSheetUnreadIds, setDiscoverSheetUnreadIds] = useState<Set<string>>(() => new Set());
@@ -68,6 +71,8 @@ export default function App() {
   const announcedDiscoverRef = useRef(new Set<string>());
   const discoverOpenRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const fileInputMediaType = useRef<AssetMediaType>("image");
+  const importInProgressRef = useRef(false);
 
   const discoverUnreadIds = new Set(discoverItems.filter((item) => !seenDiscoverIds.includes(item.id)).map((item) => item.id));
 
@@ -145,28 +150,45 @@ export default function App() {
 
   useEffect(() => { void getLicenseStatus().then(setLicenseStatus).catch((error) => setLicenseError(error instanceof Error ? error.message : String(error))).finally(() => setLicenseBusy(false)); }, []);
 
+  const checkUpdateOnce = useCallback(async () => {
+    if (updateCheckPromiseRef.current) return updateCheckPromiseRef.current;
+    const request = checkForAppUpdate();
+    updateCheckPromiseRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (updateCheckPromiseRef.current === request) updateCheckPromiseRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!licenseStatus?.valid || !isTauri) return;
-    const lastCheck = Number(localStorage.getItem("metalizer-update-check") || 0);
-    if (Number.isFinite(lastCheck) && Date.now() - lastCheck < 86_400_000) return;
-    localStorage.setItem("metalizer-update-check", String(Date.now()));
-    void checkForAppUpdate().then((update) => {
-      if (update) {
-        setUpdateAvailable(update.version);
-        addNotice("info", `Update Metalizer v${update.version} tersedia. Buka Pengaturan untuk menginstal.`);
-      }
-    }).catch(() => undefined);
-  }, [licenseStatus?.valid, addNotice]);
+    const checkUpdate = () => {
+      void checkUpdateOnce().then((update) => {
+        if (update && update.version === installedUpdateVersionRef.current) return;
+        setUpdateAvailable(update?.version);
+        if (update && announcedUpdateVersionRef.current !== update.version) {
+          announcedUpdateVersionRef.current = update.version;
+          addNotice("info", `Update Metalizer v${update.version} tersedia. Klik ikon update untuk menginstal.`);
+        }
+      }).catch(() => undefined);
+    };
+    checkUpdate();
+    const interval = window.setInterval(checkUpdate, 2 * 60 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [licenseStatus?.valid, checkUpdateOnce, addNotice]);
 
   const checkUpdates = async () => {
     if (!isTauri) { addNotice("info", "Update aplikasi hanya tersedia di aplikasi desktop."); return; }
     setUpdateBusy(true);
     try {
-      const update = await checkForAppUpdate();
-      if (!update) { setUpdateAvailable(undefined); addNotice("success", "Metalizer sudah menggunakan versi terbaru."); return; }
+      const update = await checkUpdateOnce();
+      if (!update || update.version === installedUpdateVersionRef.current) { setUpdateAvailable(undefined); addNotice("success", "Metalizer sudah menggunakan versi terbaru."); return; }
       setUpdateAvailable(update.version);
+      announcedUpdateVersionRef.current = update.version;
       if (!window.confirm(`Update Metalizer v${update.version} tersedia. Install sekarang?`)) return;
       await update.downloadAndInstall();
+      installedUpdateVersionRef.current = update.version;
       setUpdateAvailable(undefined);
       addNotice("success", "Update berhasil diinstal. Tutup lalu buka ulang Metalizer.");
     } catch (error) {
@@ -194,19 +216,30 @@ export default function App() {
   const selectedAsset = useMemo(() => assets.find((asset) => asset.id === selectedAssetId), [assets, selectedAssetId]);
   const counts = useMemo(() => ({ complete: assets.filter((asset) => asset.status === "completed").length, processing: assets.filter((asset) => asset.status === "processing" || asset.status === "preparing").length, queued: assets.filter((asset) => asset.status === "queued").length, failed: assets.filter((asset) => asset.status === "failed").length }), [assets]);
 
-  const addPaths = useCallback(async (paths: string[]) => {
+  const addPaths = useCallback(async (paths: string[], requestedType?: AssetMediaType) => {
     if (!paths.length) return;
     try {
       const existing = new Set(useAppStore.getState().assets.map((asset) => asset.path));
       const freshPaths = paths.filter((path) => !existing.has(path));
-      if (!freshPaths.length) { addNotice("info", "Gambar itu sudah ada di antrean."); return; }
+      if (!freshPaths.length) { addNotice("info", "Aset tersebut sudah ada di antrean."); return; }
       const descriptors = await inspectAssets(freshPaths);
+      const incomingTypes = new Set<AssetMediaType>(descriptors.map((descriptor) => isVideoMime(descriptor.mimeType) || isVideoPath(descriptor.path) ? "video" : "image"));
+      if (incomingTypes.size > 1) { addNotice("warning", "Pilih hanya gambar atau hanya video dalam satu impor."); return; }
+      if (!incomingTypes.size) { addNotice("warning", "Tidak ada aset yang didukung untuk diimpor."); return; }
+      const incomingType = [...incomingTypes][0];
+      if (requestedType && incomingType !== requestedType) { addNotice("warning", `Pilihan ini hanya menerima ${requestedType === "video" ? "video" : "gambar"}.`); return; }
+      const workspaceTypes = new Set<AssetMediaType>(useAppStore.getState().assets.map((asset) => asset.mediaType ?? (isVideoPath(asset.path) ? "video" : "image")));
+      if (workspaceTypes.size > 1 || (workspaceTypes.size && !workspaceTypes.has(incomingType))) {
+        addNotice("warning", "Workspace hanya dapat berisi gambar atau video. Bersihkan aset yang ada sebelum mengganti tipe.");
+        return;
+      }
       const nextAssets: StockAsset[] = descriptors.map((descriptor) => {
         const isVideo = isVideoMime(descriptor.mimeType) || isVideoPath(descriptor.path);
         return {
           ...descriptor,
           status: "queued",
           mediaType: isVideo ? "video" : "image",
+          videoPreviewStatus: isVideo ? "loading" : undefined,
         };
       });
       addAssets(nextAssets);
@@ -220,17 +253,23 @@ export default function App() {
           try {
             const meta = await extractVideoMetadataAndStoryboard(videoAsset.path);
             const current = useAppStore.getState().assets.find((candidate) => candidate.id === videoAsset.id);
-            if (!current || current.videoFrameTimes?.length) return;
+            if (!current || current.videoPreviewStatus === "ready" || current.videoFrameTimes?.length) return;
             useAppStore.getState().patchAsset(videoAsset.id, {
               width: meta.width,
               height: meta.height,
               duration: meta.duration,
               previewUrl: meta.thumbnailUrl,
               videoFramePreviews: meta.framePreviews,
+              videoPreviewStatus: "ready",
+              videoPreviewError: undefined,
             });
           } catch (err) {
             console.error(`Gagal memuat video preview untuk ${videoAsset.filename}:`, err);
-            useAppStore.getState().addNotice("warning", `${videoAsset.filename}: pratinjau video gagal dibuat. ${err instanceof Error ? err.message : String(err)}`);
+            const message = err instanceof Error ? err.message : String(err);
+            if (useAppStore.getState().assets.some((candidate) => candidate.id === videoAsset.id && candidate.videoPreviewStatus === "loading")) {
+              useAppStore.getState().patchAsset(videoAsset.id, { videoPreviewStatus: "error", videoPreviewError: message });
+              useAppStore.getState().addNotice("warning", `${videoAsset.filename}: pratinjau video gagal dibuat. ${message}`);
+            }
           }
         });
     } catch (error) {
@@ -238,45 +277,49 @@ export default function App() {
     }
   }, [addAssets, addNotice, selectedAssetId, setSelectedAssetId]);
 
-  const addImages = async () => {
-    if (!isTauri) { fileInput.current?.click(); return; }
+  const importAssets = async (task: () => Promise<void>) => {
+    if (importInProgressRef.current) return;
+    importInProgressRef.current = true;
     setIsAddingAssets(true);
-    try {
-      await addPaths(await chooseImages());
-    } finally {
-      setIsAddingAssets(false);
-    }
+    try { await task(); }
+    finally { importInProgressRef.current = false; setIsAddingAssets(false); }
   };
-  const addFolder = async () => {
-    if (!isTauri) { addNotice("info", "Pilih folder hanya tersedia di aplikasi desktop."); return; }
-    setIsAddingAssets(true);
-    try {
-      const folder = await chooseFolder();
-      if (!folder) return;
-      const result = await scanFolder(folder);
-      if (!result.paths.length) {
-        addNotice("warning", "Folder ini belum berisi gambar JPG, PNG, WebP, SVG, atau EPS yang bisa dipakai.");
-        return;
-      }
-      await addPaths(result.paths);
-      if (result.rejectedCount) addNotice("warning", `${result.rejectedCount} file yang tidak didukung dilewati.`);
-    } catch (error) {
-      addNotice("error", error instanceof Error ? error.message : "Folder tidak bisa dibaca.");
-    } finally {
-      setIsAddingAssets(false);
+  const addFiles = async (mediaType: AssetMediaType) => {
+    if (!isTauri) {
+      fileInputMediaType.current = mediaType;
+      if (fileInput.current) fileInput.current.accept = mediaType === "video" ? ".mp4,.mov,.webm,.m4v" : ".jpg,.jpeg,.png,.webp,.svg,.eps";
+      fileInput.current?.click();
+      return;
     }
+    await importAssets(async () => addPaths(await chooseAssets(mediaType), mediaType));
+  };
+  const addFolder = async (mediaType: AssetMediaType) => {
+    if (!isTauri) { addNotice("info", "Pilih folder hanya tersedia di aplikasi desktop."); return; }
+    await importAssets(async () => {
+      try {
+        const folder = await chooseFolder();
+        if (!folder) return;
+        const result = await scanFolder(folder);
+        const matchingPaths = result.paths.filter((path) => (isVideoPath(path) ? "video" : "image") === mediaType);
+        if (!matchingPaths.length) {
+          addNotice("warning", `Folder ini belum berisi ${mediaType === "video" ? "video" : "gambar"} yang didukung.`);
+          return;
+        }
+        await addPaths(matchingPaths, mediaType);
+        const otherCount = result.paths.length - matchingPaths.length;
+        if (otherCount) addNotice("info", `${otherCount} aset tipe lain dilewati.`);
+        if (result.rejectedCount) addNotice("warning", `${result.rejectedCount} file yang tidak didukung dilewati.`);
+      } catch (error) {
+        addNotice("error", error instanceof Error ? error.message : "Folder tidak bisa dibaca.");
+      }
+    });
   };
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     const paths = Array.from(event.dataTransfer.files).map((file) => (file as File & { path?: string }).path).filter((path): path is string => Boolean(path));
-    if (!paths.length) { addNotice("warning", "Gunakan Tambah gambar di aplikasi desktop untuk memasukkan file lokal."); return; }
-    setIsAddingAssets(true);
-    try {
-      await addPaths(paths);
-    } finally {
-      setIsAddingAssets(false);
-    }
+    if (!paths.length) { addNotice("warning", "Gunakan tombol Gambar atau Video di aplikasi desktop untuk memasukkan file lokal."); return; }
+    await importAssets(async () => addPaths(paths));
   };
 
   const updateMetadata = (assetId: string, metadata: StockMetadata) => patchAsset(assetId, { metadata, status: "completed", error: undefined });
@@ -296,6 +339,8 @@ export default function App() {
       videoFrameTimes: [...times],
       videoCoverTime: coverTime,
       videoFramePreviews: meta.framePreviews,
+      videoPreviewStatus: "ready",
+      videoPreviewError: undefined,
     });
     if (asset.storyboardPath) void cleanupTempFile(asset.storyboardPath).catch(console.error);
     current.addNotice("success", `${times.length} gambar video disimpan. Gambar utama dan storyboard sudah diperbarui.`);
@@ -388,6 +433,8 @@ export default function App() {
         onOpenGuide={() => setGuideOpen(true)}
         onOpenDiscover={() => { setDiscoverSheetUnreadIds(new Set(discoverUnreadIds)); discoverOpenRef.current = true; setDiscoverOpen(true); }}
         discoverUnreadCount={discoverUnreadIds.size}
+        updateAvailable={updateAvailable}
+        onOpenUpdates={() => setSettingsOpen(true)}
         metadataMode={settings.metadataMode}
         onModeChange={(metadataMode: MetadataMode) => setSettings({ ...settings, metadataMode })}
         onExport={startExport}
@@ -444,7 +491,7 @@ export default function App() {
           onClearAll={clearAll}
           onRetryFailed={() => { void runGeneration({ onlyFailed: true }); }}
           onDrop={handleDrop}
-          onChoose={addImages}
+          onChoose={addFiles}
           onAddFolder={addFolder}
           onSelectAll={() => selectedAssetIds.length === assets.length ? clearSelection() : selectAll()}
           onSetCategory={bulkSetCategory}
@@ -486,8 +533,7 @@ export default function App() {
         accept=".jpg,.jpeg,.png,.webp,.svg,.eps"
         onChange={(event) => {
           const paths = Array.from(event.target.files ?? []).map((file) => (file as File & { path?: string }).path).filter((path): path is string => Boolean(path));
-          setIsAddingAssets(true);
-          void addPaths(paths).finally(() => setIsAddingAssets(false));
+          void importAssets(async () => addPaths(paths, fileInputMediaType.current));
           event.target.value = "";
         }}
       />

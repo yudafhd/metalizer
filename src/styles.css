@@ -803,14 +803,14 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
-@keyframes discover-bell-shake {
+@keyframes notification-icon-shake {
   0%, 83%, 100% { transform: rotate(0deg); }
   86%, 94% { transform: rotate(16deg); }
   90%, 98% { transform: rotate(-16deg); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .discover-bell-shake { transform-origin: top center; animation: discover-bell-shake 3s ease-in-out infinite; }
+  .notification-icon-shake { transform-origin: top center; animation: notification-icon-shake 3s ease-in-out infinite; }
 }
 
 /* Remove password reveal eye in WebView2 */

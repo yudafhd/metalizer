@@ -5,6 +5,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import type {
   ApiStatus,
   AssetDescriptor,
+  AssetMediaType,
   ContactSheetRequest,
   ContactSheetResult,
   CsvExportRequest,
@@ -27,15 +28,13 @@ export async function invokeCommand<T>(command: string, args?: Record<string, un
   return invoke<T>(command, args);
 }
 
-export async function chooseImages(): Promise<string[]> {
+export async function chooseAssets(mediaType: AssetMediaType): Promise<string[]> {
   const selected = await open({
     multiple: true,
     directory: false,
-    filters: [
-      { name: "Media (Gambar & Video)", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps", "mp4", "mov", "webm", "m4v"] },
-      { name: "Gambar", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps"] },
-      { name: "Video", extensions: ["mp4", "mov", "webm", "m4v"] },
-    ],
+    filters: mediaType === "video"
+      ? [{ name: "Video", extensions: ["mp4", "mov", "webm", "m4v"] }]
+      : [{ name: "Gambar", extensions: ["jpg", "jpeg", "png", "webp", "svg", "eps"] }],
   });
   if (!selected) return [];
   return Array.isArray(selected) ? selected : [selected];

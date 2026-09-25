@@ -5,6 +5,12 @@ use serde::Deserialize;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration as StdDuration, Instant};
 use tauri::{command, AppHandle, Manager};
+#[cfg(windows)]
+use guardian_core::DeviceProvider;
+#[cfg(windows)]
+use sha2::{Digest, Sha256};
+#[cfg(windows)]
+use winreg::{enums::HKEY_LOCAL_MACHINE, RegKey};
 
 const TIME_NOW_URL: &str = "https://time.now/developer/api/timezone/Asia/Jakarta";
 const TIME_NOW_TIMEZONE: &str = "Asia/Jakarta";
@@ -59,14 +65,58 @@ fn public_key() -> &'static str {
     option_env!("LICENSE_PUBLIC_KEY").unwrap_or("")
 }
 
-fn manager(app: &AppHandle) -> Result<LicenseManager<JsonFileStore>, String> {
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+struct NativeWindowsDevice;
+
+#[cfg(windows)]
+impl DeviceProvider for NativeWindowsDevice {
+    fn device_id(&self, namespace: &str) -> String {
+        let material = RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey(r"SOFTWARE\Microsoft\Cryptography")
+            .and_then(|key| key.get_value::<String, _>("MachineGuid"))
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| value.trim().to_owned())
+            .unwrap_or_else(|| {
+                format!(
+                    "{}|{}|{}|{}",
+                    std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default(),
+                    std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")).unwrap_or_default(),
+                    std::env::consts::OS,
+                    std::env::consts::ARCH,
+                )
+            });
+        let digest = Sha256::digest(format!("secure-license-core/{namespace}|{material}").as_bytes());
+        digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+}
+
+#[cfg(windows)]
+type AppLicenseManager = LicenseManager<JsonFileStore, NativeWindowsDevice>;
+#[cfg(not(windows))]
+type AppLicenseManager = LicenseManager<JsonFileStore>;
+
+fn manager(app: &AppHandle) -> Result<AppLicenseManager, String> {
     let public_key = public_key();
     if public_key.trim().is_empty() {
         return Err("Public key lisensi belum dikonfigurasi pada build aplikasi.".into());
     }
     let path = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("license.json");
     let product = option_env!("LICENSE_PRODUCT_CODE").unwrap_or("metalizer");
-    Ok(LicenseManager::new(LicenseConfig::new(product, format!("{product}/v1"), public_key), JsonFileStore::new(path)))
+    let config = LicenseConfig::new(product, format!("{product}/v1"), public_key);
+    let store = JsonFileStore::new(path);
+    #[cfg(windows)]
+    { Ok(LicenseManager::with_device_provider(config, store, NativeWindowsDevice)) }
+    #[cfg(not(windows))]
+    { Ok(LicenseManager::new(config, store)) }
+}
+
+#[cfg(all(test, windows))]
+#[test]
+fn native_windows_device_preserves_existing_license_fingerprint() {
+    let namespace = "metalizer/v1";
+    assert_eq!(NativeWindowsDevice.device_id(namespace), guardian_core::device::system_device_id(namespace));
 }
 
 #[command]

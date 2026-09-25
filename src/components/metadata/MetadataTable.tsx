@@ -1,11 +1,11 @@
-import { AlertCircle, CheckCheck, CheckCircle2, ChevronDown, FileImage, FolderOpen, ImagePlus, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, Video, X } from "lucide-react";
+import { AlertCircle, CheckCheck, CheckCircle2, ChevronDown, FileImage, FolderOpen, Images, LoaderCircle, Minus, RotateCcw, Square, Tag, Trash2, Video, X } from "lucide-react";
 import { useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
 import { AdditionalPromptBar } from "./AdditionalPromptBar";
-import type { StockAsset } from "../../types";
+import type { AssetMediaType, StockAsset } from "../../types";
 import { metadataLabel } from "../../utils/metadata";
-import { formatDuration } from "../../services/video";
+import { formatDuration, isVideoPath } from "../../services/video";
 
 interface MetadataTableProps {
   assets: StockAsset[];
@@ -21,8 +21,8 @@ interface MetadataTableProps {
   onClearAll: () => void;
   onRetryFailed: () => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
-  onChoose: () => void;
-  onAddFolder: () => void;
+  onChoose: (mediaType: AssetMediaType) => void;
+  onAddFolder: (mediaType: AssetMediaType) => void;
   onSelectAll: () => void;
   onSetCategory: (category: number) => void;
   onAddKeyword: (keyword: string) => void;
@@ -59,6 +59,9 @@ export function MetadataTable({
   const [keyword, setKeyword] = useState("");
   const [removeKeyword, setRemoveKeyword] = useState("");
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const workspaceTypes = new Set<AssetMediaType>(assets.map((asset) => asset.mediaType ?? (isVideoPath(asset.path) ? "video" : "image")));
+  const canAddType = (mediaType: AssetMediaType) => !isAddingAssets && (workspaceTypes.size === 0 || (workspaceTypes.size === 1 && workspaceTypes.has(mediaType)));
 
   const submitAdd = () => {
     if (keyword.trim()) {
@@ -95,22 +98,31 @@ export function MetadataTable({
         </div>
 
         <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
-          <button
-            className="app-button app-button-primary h-8 px-2.5 text-[11px]"
-            disabled={isAddingAssets}
-            onClick={onChoose}
-            title="Pilih gambar atau video"
-          >
-            {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <Images size={13} />} {isAddingAssets ? "Memuat..." : "Tambah"}
+          <button className="app-button app-button-primary h-8 px-2.5 text-[11px]" disabled={!canAddType("image")} onClick={() => onChoose("image")} title={canAddType("image") ? "Pilih gambar" : "Kosongkan workspace video sebelum menambah gambar"}>
+            {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <FileImage size={13} />} Gambar
           </button>
           <button
             className="app-button h-8 px-2.5 text-[11px]"
-            disabled={isAddingAssets}
-            onClick={() => void onAddFolder()}
-            title="Pilih folder gambar atau video"
+            disabled={!canAddType("video")}
+            onClick={() => onChoose("video")}
+            title={canAddType("video") ? "Pilih video" : "Kosongkan workspace gambar sebelum menambah video"}
           >
-            {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <FolderOpen size={13} />} {isAddingAssets ? "Membaca..." : "Folder"}
+            {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <Video size={13} />} Video
           </button>
+          <div className="relative">
+            <button type="button" className="app-button h-8 px-2.5 text-[11px]" disabled={isAddingAssets || workspaceTypes.size > 1} onClick={() => setFolderMenuOpen((open) => !open)} aria-expanded={folderMenuOpen} aria-haspopup="menu" title="Pilih folder gambar atau video">
+              <FolderOpen size={13} /> Folder <ChevronDown size={11} className={`transition-transform ${folderMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {folderMenuOpen ? (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setFolderMenuOpen(false)} />
+                <div className="absolute right-0 top-9 z-30 w-44 rounded-xl border border-line bg-surface p-1 shadow-modal" role="menu">
+                  <button type="button" role="menuitem" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-ink hover:bg-surface-sunken disabled:opacity-40" disabled={!canAddType("image")} onClick={() => { setFolderMenuOpen(false); onAddFolder("image"); }}><FileImage size={14} /> Folder gambar</button>
+                  <button type="button" role="menuitem" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-ink hover:bg-surface-sunken disabled:opacity-40" disabled={!canAddType("video")} onClick={() => { setFolderMenuOpen(false); onAddFolder("video"); }}><Video size={14} /> Folder video</button>
+                </div>
+              </>
+            ) : null}
+          </div>
 
           {failedCount > 0 && (
             <button
@@ -236,7 +248,7 @@ export function MetadataTable({
 
       {assets.length === 0 ? (
         <div className="min-h-0 flex-1">
-          <TableEmpty onDrop={onDrop} onChoose={onChoose} />
+          <TableEmpty onDrop={onDrop} onChoose={onChoose} isAddingAssets={isAddingAssets} />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -287,7 +299,7 @@ export function MetadataTable({
             onDragOver={(event) => event.preventDefault()}
             onDrop={onDrop}
           >
-            <p className="text-[11px] font-semibold text-accent-700">Tarik gambar lain ke sini untuk menambah antrean</p>
+            <p className="text-[11px] font-semibold text-accent-700">Tarik {workspaceTypes.has("video") ? "video" : "gambar"} lain ke sini untuk menambah antrean</p>
           </div>
         </div>
       )}
@@ -314,6 +326,7 @@ function MetadataRow({
 }) {
   const metadata = asset.metadata;
   const isLoading = isGenerating && (asset.status === "queued" || asset.status === "preparing" || asset.status === "processing");
+  const previewLoading = asset.mediaType === "video" && asset.videoPreviewStatus === "loading";
   const loadingLabel = asset.status === "queued" ? "Menunggu antrean" : asset.status === "preparing" ? "Menyiapkan gambar" : "Sedang generate";
 
   return (
@@ -354,7 +367,7 @@ function MetadataRow({
               {asset.duration ? formatDuration(asset.duration) : "VIDEO"}
             </span>
           ) : null}
-          {isLoading ? (
+          {isLoading || previewLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-ink/40 backdrop-blur-[1px]">
               <LoaderCircle size={17} className="animate-spin text-white" />
             </div>
@@ -373,6 +386,8 @@ function MetadataRow({
         <p className="mt-0.5 text-[10px] font-medium text-ink-muted">
           {asset.width > 0 ? `${asset.width} × ${asset.height}` : "Video"}
         </p>
+        {previewLoading ? <p className="mt-0.5 truncate text-[10px] font-semibold text-accent-500">Memuat pratinjau...</p> : null}
+        {asset.videoPreviewStatus === "error" ? <p className="mt-0.5 truncate text-[10px] font-semibold text-amber-500" title={asset.videoPreviewError}>Pratinjau gagal</p> : null}
       </td>
       <td className="max-w-[290px] px-2 py-3.5">
         <p className={`truncate text-[12px] leading-snug ${metadata?.title ? "font-semibold text-ink" : "italic text-ink-muted"}`}>
@@ -439,7 +454,7 @@ function MetadataRow({
   );
 }
 
-function TableEmpty({ onDrop, onChoose }: { onDrop: (event: React.DragEvent<HTMLDivElement>) => void; onChoose: () => void }) {
+function TableEmpty({ onDrop, onChoose, isAddingAssets }: { onDrop: (event: React.DragEvent<HTMLDivElement>) => void; onChoose: (mediaType: AssetMediaType) => void; isAddingAssets: boolean }) {
   return (
     <div className="flex h-full items-center justify-center bg-surface-sunken/40" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <div className="max-w-[410px] rounded-2xl border border-dashed border-accent-200 bg-surface px-8 py-8 text-center shadow-panel">
@@ -448,7 +463,7 @@ function TableEmpty({ onDrop, onChoose }: { onDrop: (event: React.DragEvent<HTML
         </div>
         <h2 className="mt-4 text-[17px] font-extrabold text-ink">Tambah gambar atau video</h2>
         <p className="mt-2 text-[12px] leading-6 text-ink-muted">
-          Tarik file ke sini atau pilih dari perangkat.
+          Pilih salah satu tipe aset atau tarik file sejenis ke sini.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2 text-left">
           <div className="rounded-xl border border-line bg-surface-sunken/60 p-3">
@@ -460,9 +475,10 @@ function TableEmpty({ onDrop, onChoose }: { onDrop: (event: React.DragEvent<HTML
             <p className="mt-1 text-[10px] leading-4 text-ink-muted">MP4, MOV, WebM, M4V</p>
           </div>
         </div>
-        <button className="app-button app-button-primary mt-5 h-9 px-5 text-[11px]" onClick={onChoose}>
-          <ImagePlus size={14} /> Pilih file
-        </button>
+        <div className="mt-5 flex justify-center gap-2">
+          <button className="app-button app-button-primary h-9 px-4 text-[11px]" disabled={isAddingAssets} onClick={() => onChoose("image")}><FileImage size={14} /> Pilih gambar</button>
+          <button className="app-button h-9 px-4 text-[11px]" disabled={isAddingAssets} onClick={() => onChoose("video")}><Video size={14} /> Pilih video</button>
+        </div>
       </div>
     </div>
   );

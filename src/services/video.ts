@@ -10,6 +10,8 @@ export interface VideoMetadataResult {
 }
 
 export const MAX_VIDEO_FRAMES = 6;
+const VIDEO_SEEK_TIMEOUT_MS = 30_000;
+let extractionQueue: Promise<void> = Promise.resolve();
 
 export function suggestedVideoFrameTimes(duration: number): number[] {
   const percentages = duration >= 30
@@ -37,21 +39,35 @@ export function formatDuration(seconds?: number): string {
 
 export function seekToTime(video: HTMLVideoElement, time: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => finish(new Error(`Gagal mengambil frame pada detik ${time.toFixed(1)}.`)), 5000);
+    let settled = false;
+    let waitingForFrame = false;
+    let frameCallbackId: number | undefined;
+    let frameFallback: number | undefined;
+    const timeout = window.setTimeout(() => finish(new Error(`Gagal mengambil frame pada detik ${time.toFixed(1)}. Video beresolusi tinggi mungkin membutuhkan codec yang didukung sistem.`)), VIDEO_SEEK_TIMEOUT_MS);
     const cleanup = () => {
       window.clearTimeout(timeout);
+      if (frameFallback !== undefined) window.clearTimeout(frameFallback);
+      if (frameCallbackId !== undefined) video.cancelVideoFrameCallback(frameCallbackId);
       video.removeEventListener("seeked", onReady);
       video.removeEventListener("loadeddata", onReady);
       video.removeEventListener("error", onError);
     };
     const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
       cleanup();
       if (error) reject(error);
       else resolve();
     };
     const onReady = () => {
-      if (!video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && Math.abs(video.currentTime - time) < 0.25) {
-        finish();
+      if (!waitingForFrame && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && Math.abs(video.currentTime - time) < 0.25) {
+        waitingForFrame = true;
+        if (typeof video.requestVideoFrameCallback === "function") {
+          frameCallbackId = video.requestVideoFrameCallback(() => finish());
+          frameFallback = window.setTimeout(() => finish(), 1_000);
+        } else {
+          finish();
+        }
       }
     };
     const onError = () => finish(new Error("Gagal mendekode frame video."));
@@ -148,20 +164,30 @@ function createStoryboardGrid(
   return collage;
 }
 
-export async function extractVideoMetadataAndStoryboard(
+export function extractVideoMetadataAndStoryboard(
+  filePath: string,
+  frameTimes?: number[],
+  coverTime?: number,
+): Promise<VideoMetadataResult> {
+  const result = extractionQueue.then(() => extractVideoMetadataAndStoryboardNow(filePath, frameTimes, coverTime));
+  extractionQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+async function extractVideoMetadataAndStoryboardNow(
   filePath: string,
   frameTimes?: number[],
   coverTime?: number,
 ): Promise<VideoMetadataResult> {
   const video = document.createElement("video");
-  video.preload = "auto";
+  video.preload = "metadata";
   video.muted = true;
   video.playsInline = true;
   video.crossOrigin = "anonymous";
 
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => finish(new Error("Gagal membaca metadata video: waktu tunggu habis.")), 15000);
+      const timeout = window.setTimeout(() => finish(new Error("Gagal membaca metadata video: waktu tunggu habis.")), 30_000);
       const cleanup = () => {
         window.clearTimeout(timeout);
         video.removeEventListener("loadedmetadata", onLoaded);

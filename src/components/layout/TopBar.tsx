@@ -16,6 +16,8 @@ interface TopBarProps {
   onOpenGuide: () => void;
   onOpenDiscover: () => void;
   discoverUnreadCount: number;
+  updateAvailable?: string;
+  onOpenUpdates: () => void;
   metadataMode: MetadataMode;
   onModeChange: (mode: MetadataMode) => void;
   onExport: () => void;
@@ -34,6 +36,8 @@ export function TopBar({
   onOpenGuide,
   onOpenDiscover,
   discoverUnreadCount,
+  updateAvailable,
+  onOpenUpdates,
   metadataMode,
   onModeChange,
   onExport,
@@ -151,7 +155,17 @@ export function TopBar({
           </button>
         )}
 
-        {/* Theme Button placed to the left of the Guide button */}
+        <button
+          type="button"
+          className="app-button app-button-quiet relative h-9 w-9 px-0"
+          onClick={onOpenUpdates}
+          title={updateAvailable ? `Update Metalizer v${updateAvailable} tersedia` : "Periksa update aplikasi"}
+          aria-label={updateAvailable ? `Buka update Metalizer v${updateAvailable}` : "Periksa update aplikasi"}
+        >
+          <Download size={17} className={updateAvailable ? "notification-icon-shake text-accent-600" : ""} />
+          {updateAvailable ? <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-surface bg-rose-500" /> : null}
+        </button>
+
         <button
           type="button"
           className="app-button app-button-quiet relative h-9 w-9 px-0"
@@ -159,7 +173,7 @@ export function TopBar({
           title={discoverUnreadCount ? `${discoverUnreadCount} kabar baru dari Mahes` : "Buka Discover"}
           aria-label={discoverUnreadCount ? `Buka Discover, ${discoverUnreadCount} kabar baru` : "Buka Discover"}
         >
-          <Bell size={17} className={discoverUnreadCount ? "discover-bell-shake text-accent-600" : ""} />
+          <Bell size={17} className={discoverUnreadCount ? "notification-icon-shake text-accent-600" : ""} />
           {discoverUnreadCount ? (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white shadow-sm">
               {discoverUnreadCount > 9 ? "9+" : discoverUnreadCount}

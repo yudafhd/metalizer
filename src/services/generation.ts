@@ -112,6 +112,8 @@ async function processJob(job: BatchJob, settings: AppSettings, scope: "full" | 
                   height: videoMeta.height,
                   duration: videoMeta.duration,
                   mediaType: "video",
+                  videoPreviewStatus: "ready",
+                  videoPreviewError: undefined,
                 });
               }
               pathForSheet = storyboardPath;

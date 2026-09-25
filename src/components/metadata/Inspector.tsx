@@ -1,4 +1,4 @@
-import { Clipboard, FileImage, Film, Plus, RotateCcw, Undo2, X } from "lucide-react";
+import { Clipboard, FileImage, Film, LoaderCircle, Plus, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
@@ -95,9 +95,19 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken/20 p-5">
-        <div className="flex h-[176px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-sunken p-2 shadow-sm">
+        <div className="flex h-[176px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-sunken p-2 shadow-sm" role={isVideo && asset.videoPreviewStatus === "loading" ? "status" : undefined}>
           {activeFrame?.imageUrl || asset.previewUrl ? (
             <img src={activeFrame?.imageUrl ?? asset.previewUrl} alt={activeFrame ? `${asset.filename} pada ${formatDuration(activeFrame.time)}` : asset.filename} className="max-h-full max-w-full object-contain" />
+          ) : isVideo && asset.videoPreviewStatus === "loading" ? (
+            <div className="flex flex-col items-center gap-2 text-accent-500">
+              <LoaderCircle size={26} className="animate-spin" />
+              <span className="text-[11px] font-semibold">Memuat pratinjau video...</span>
+            </div>
+          ) : isVideo && asset.videoPreviewStatus === "error" ? (
+            <div className="flex flex-col items-center gap-2 text-amber-500" title={asset.videoPreviewError}>
+              <Film size={26} />
+              <span className="text-[11px] font-semibold">Pratinjau video gagal</span>
+            </div>
           ) : isVideo ? (
             <Film size={28} className="text-accent-300" />
           ) : (
@@ -129,7 +139,7 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
           </div>
         ) : null}
         {isVideo ? (
-          <button type="button" className="app-button mt-2.5 w-full text-[11px]" onClick={() => setFrameModalOpen(true)} disabled={asset.status === "processing" || asset.status === "preparing"}>
+          <button type="button" className="app-button mt-2.5 w-full text-[11px]" onClick={() => setFrameModalOpen(true)} disabled={asset.status === "processing" || asset.status === "preparing" || asset.videoPreviewStatus === "loading"}>
             <Film size={14} /> Pilih titik gambar video
           </button>
         ) : null}

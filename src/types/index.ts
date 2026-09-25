@@ -42,6 +42,8 @@ export interface StockMetadata {
   metadataMode: MetadataMode;
 }
 
+export type AssetMediaType = "image" | "video";
+
 export interface StockAsset {
   id: string;
   filename: string;
@@ -51,7 +53,9 @@ export interface StockAsset {
   height: number;
   fileSize: number;
   previewUrl?: string;
-  mediaType?: "image" | "video";
+  mediaType?: AssetMediaType;
+  videoPreviewStatus?: "loading" | "ready" | "error";
+  videoPreviewError?: string;
   duration?: number;
   storyboardPath?: string;
   videoFrameTimes?: number[];

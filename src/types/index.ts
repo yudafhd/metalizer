@@ -54,6 +54,9 @@ export interface StockAsset {
   mediaType?: "image" | "video";
   duration?: number;
   storyboardPath?: string;
+  videoFrameTimes?: number[];
+  videoCoverTime?: number;
+  videoFramePreviews?: { time: number; imageUrl: string }[];
   batchId?: string;
   status: AssetStatus;
   metadata?: StockMetadata;
@@ -141,7 +144,7 @@ export interface GenerateMetadataRequest {
   batchId: string;
   contactSheetPath: string;
   expectedIds: string[];
-  mapping: { id: string; filename: string }[];
+  mapping: { id: string; filename: string; existingTitle?: string }[];
   model: string;
   mode: string;
   targetKeywords: number;
@@ -207,12 +210,16 @@ export interface CsvExportRow {
   keywords: string[];
   category: number;
   releases?: string;
+  shutterstockCategory?: string;
 }
+
+export type CsvExportPlatform = "adobe" | "shutterstock" | "pond5" | "freepik";
 
 export interface CsvExportRequest {
   outputPath: string;
   rows: CsvExportRow[];
   includeReleases: boolean;
+  platform: CsvExportPlatform;
 }
 
 export interface CsvExportResult {

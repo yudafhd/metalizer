@@ -1,8 +1,10 @@
 # Metalizer — Microstock Metadata
 
-Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memvalidasi, dan mengekspor metadata gambar secara batch untuk Adobe Stock. Metalizer menggunakan Gemini untuk membuat saran `Title`, `Keywords`, dan `Category`; keputusan akhir dan pemeriksaan metadata tetap berada di tangan pengguna.
+Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memvalidasi, dan mengekspor metadata gambar secara batch untuk Adobe Stock, Shutterstock, Pond5, dan Freepik / Magnific. Metalizer menggunakan Gemini untuk membuat saran `Title`, `Keywords`, dan `Category`; keputusan akhir dan pemeriksaan metadata tetap berada di tangan pengguna.
 
-> Versi saat ini: `0.2.2`
+> Versi saat ini: `0.2.3`
+
+Panduan penyusunan metadata: [Metadata Microstock](Metadata%20Microstock.md).
 
 
 ## Fitur
@@ -16,7 +18,7 @@ Metalizer adalah aplikasi desktop **local-first** untuk membuat, meninjau, memva
 - Bulk edit untuk mengubah kategori atau keyword beberapa gambar sekaligus.
 - Generate ulang hanya untuk title, keywords, atau seluruh metadata.
 - Nilai kualitas dan peringatan sebelum export.
-- Export CSV UTF-8 dengan format Adobe Stock, termasuk opsi kolom `Releases`.
+- Export CSV UTF-8 untuk Adobe Stock, Shutterstock, Pond5, dan Freepik / Magnific, termasuk opsi kolom `Releases` untuk Adobe.
 - API key disimpan di Tauri Stronghold, bukan di `localStorage` atau file `.env`.
 - File gambar asli tidak dipindahkan atau ditimpa.
 
@@ -136,6 +138,15 @@ Pasang hal berikut sebelum menjalankan proyek:
 
 Detail prasyarat Tauri dapat dilihat pada dokumentasi resmi Tauri sesuai sistem operasi yang digunakan.
 
+Di Windows, siapkan libsodium dengan runtime C yang sesuai sebelum menjalankan `tauri dev` atau membuat installer. Jalankan di PowerShell yang sama dengan perintah build:
+
+```powershell
+.\scripts\setup-windows-libsodium.ps1
+npm run tauri dev
+```
+
+Skrip mengunduh vcpkg ke `src-tauri/target/vcpkg` bila belum tersedia, memasang `libsodium:x64-windows-static-md`, lalu mengatur variabel lingkungan untuk sesi terminal tersebut. Build macOS dan Linux tidak memakai pengaturan ini. Workflow rilis menyiapkan libsodium hanya pada job Windows.
+
 ## Instalasi dan menjalankan aplikasi
 
 Di folder proyek, jalankan:
@@ -163,16 +174,9 @@ Hasil bundle akan dibuat oleh Tauri di folder `src-tauri/target/release/bundle/`
 
 ## Rilis GitHub
 
-Build CI berjalan saat ada push ke `master` dan hanya mengunggah artifact. Untuk menerbitkan rilis, naikkan versi yang sama di `package.json`, `src-tauri/Cargo.toml`, dan `src-tauri/tauri.conf.json`, lalu push commit tersebut ke branch `release` atau jalankan workflow **Publish desktop release** secara manual.
+Workflow CI berjalan saat pull request atau push ke `master`. CI menjalankan typecheck dan test frontend serta test Rust; workflow ini tidak membuat installer atau mengunggah artifact.
 
-Workflow publish memverifikasi ketiga versi, membangun NSIS Windows serta DMG/app macOS Intel dan Apple Silicon, membuat tag `v<version>`, lalu membuat GitHub Release. Repository secret `LICENSE_PUBLIC_KEY` wajib berisi public key lisensi raw base64url.
-
-Metalizer juga mendukung auto-update bertanda tangan melalui `latest.json` pada GitHub Release. Tambahkan secret berikut sebelum menerbitkan rilis pertama:
-
-- `TAURI_SIGNING_PRIVATE_KEY`: isi file lokal `updater-keys/metalizer-updater.key`.
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: opsional; kosongkan jika key dibuat tanpa password.
-
-Public key updater sudah ditanam di `src-tauri/tauri.conf.json`. Jangan commit folder `updater-keys` atau membagikan private key tersebut.
+Untuk membuat rilis desktop, ikuti [panduan rilis](docs/RELEASING.md). Workflow **Publish desktop release** membangun installer Windows x64 (NSIS) dan bundle macOS Intel (`.dmg` dan `.app`), lalu menerbitkan GitHub Release. Workflow berjalan saat tag `v*` di-push atau dapat dijalankan manual dari tab Actions.
 
 ## Tutorial penggunaan
 
@@ -240,16 +244,21 @@ Gunakan tombol berikut bila diperlukan:
 
 1. Pastikan metadata semua gambar sudah selesai dan tidak memiliki error validasi.
 2. Klik **Export CSV**.
-3. Pilih lokasi penyimpanan.
-4. Jika ada peringatan, pilih **Cek dulu** untuk memperbaiki atau **Tetap export** untuk melanjutkan.
+3. Pilih Adobe Stock, Shutterstock, Pond5, atau Freepik / Magnific. Untuk Shutterstock, periksa kategori setiap aset karena kategorinya berbeda dari Adobe.
+4. Pilih lokasi penyimpanan. Aset yang belum selesai dilewati dan masalah validasi ditampilkan sebelum ekspor.
 
-CSV memiliki header utama:
+Kolom CSV mengikuti situs tujuan:
 
 ```text
-Filename,Title,Keywords,Category
+Adobe Stock:  Filename,Title,Keywords,Category
+Shutterstock: Filename,Description,Keywords,Categories
+Pond5:       OriginalFilename,Title,Keywords
+Freepik:     File name;Title;Keywords
 ```
 
-Jika opsi **Sertakan kolom Releases** aktif, kolom `Releases` juga ditambahkan. Export besar dapat dibagi otomatis menjadi beberapa file. Metalizer hanya membuat CSV; proses upload ke Adobe Stock dilakukan secara terpisah.
+Jika opsi **Sertakan kolom Releases** aktif, kolom `Releases` ditambahkan untuk Adobe Stock. Freepik memakai pemisah kolom titik koma dan hanya menyertakan gambar. Export besar dapat dibagi otomatis menjadi beberapa file. Metalizer hanya membuat CSV; unggah media dahulu lalu unggah CSV lewat portal kontributor masing-masing situs. Judul dan keyword berasal dari metadata aset saat ini; tinjau lagi relevansinya untuk situs tujuan.
+
+Rujukan format: [Adobe Stock](https://helpx.adobe.com/stock/contributor/manage-your-portfolio/create-csv-file.html), [Shutterstock](https://submit.shutterstock.com/help/en/articles/10617486-how-do-i-include-existing-metadata-with-my-content-submission), [Pond5](https://contributor.pond5.com/getting-started/preparing-your-files/), dan [Freepik / Magnific](https://www.magnific.com/ai/contributors/how-to-create-a-csv-file).
 
 ## Status dan kondisi offline
 

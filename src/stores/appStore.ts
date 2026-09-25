@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxSheetSize: 2048,
   background: "neutral",
   includeReleases: false,
-  theme: "nebula",
+  theme: "obsidian",
 };
 
 export interface Notice {

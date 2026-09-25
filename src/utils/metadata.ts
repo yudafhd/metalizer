@@ -1,6 +1,6 @@
 import type { MetadataWarning, StockAsset, StockMetadata, ValidationResult } from "../types";
 
-export const IDEAL_KEYWORD_MIN = 20;
+export const IDEAL_KEYWORD_MIN = 15;
 export const IDEAL_KEYWORD_MAX = 35;
 
 const LOW_VALUE_KEYWORDS = new Set([
@@ -83,20 +83,6 @@ export function normalizeKeywords(raw: string[], filename: string, maximum = 49)
     if (result.length >= maximum) break;
   }
   return result;
-}
-
-export function prioritizeKeywords(keywords: string[], title: string): string[] {
-  const titleWords = new Set(
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, " ")
-      .split(/\s+/)
-      .filter((word) => word.length > 2),
-  );
-  return keywords
-    .map((keyword, index) => ({ keyword, index, score: keyword.toLowerCase().split(/\s+/).filter((word) => titleWords.has(word)).length }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .map(({ keyword }) => keyword);
 }
 
 export function validateMetadata(

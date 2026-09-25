@@ -15,7 +15,9 @@ pub async fn generate_metadata(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<MetadataGenerationResult, String> {
-    crate::commands::license::require_license(&app)?;
+    tokio::task::spawn_blocking(move || crate::commands::license::require_license(&app))
+        .await
+        .map_err(|error| format!("Pemeriksaan lisensi gagal dijalankan: {error}"))??;
     let api_key = state
         .api_key
         .lock()

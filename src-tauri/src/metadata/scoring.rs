@@ -9,8 +9,8 @@ pub fn quality_score(title: &str, keywords: &[String], category: u8, validation:
         0
     };
     let keyword_count = match keywords.len() {
-        20..=35 => 10,
-        10..=19 | 36..=49 => 7,
+        15..=35 => 10,
+        10..=14 | 36..=49 => 7,
         _ => 0,
     };
     let unique = keywords

@@ -3,7 +3,7 @@ import type { Notice } from "../../stores/appStore";
 
 export function NoticeStack({ notices, onDismiss }: { notices: Notice[]; onDismiss: (id: string) => void }) {
   return (
-    <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex w-[360px] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 flex w-[calc(100vw-2rem)] max-w-[360px] -translate-x-1/2 flex-col gap-2">
       {notices.map((notice) => (
         <div
           key={notice.id}

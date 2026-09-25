@@ -46,6 +46,8 @@ pub struct ContactSheetResult {
 pub struct AssetMapping {
     pub id: String,
     pub filename: String,
+    #[serde(default)]
+    pub existing_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +114,21 @@ pub struct CsvExportRow {
     pub category: u8,
     #[serde(default)]
     pub releases: Option<String>,
+    #[serde(default)]
+    pub shutterstock_category: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CsvExportPlatform {
+    Adobe,
+    Shutterstock,
+    Pond5,
+    Freepik,
+}
+
+impl Default for CsvExportPlatform {
+    fn default() -> Self { Self::Adobe }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +137,8 @@ pub struct CsvExportRequest {
     pub output_path: String,
     pub rows: Vec<CsvExportRow>,
     pub include_releases: bool,
+    #[serde(default)]
+    pub platform: CsvExportPlatform,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

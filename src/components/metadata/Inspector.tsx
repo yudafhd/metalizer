@@ -1,11 +1,11 @@
-import { Clipboard, FileImage, Plus, RotateCcw, Undo2, X } from "lucide-react";
+import { Clipboard, FileImage, Film, Plus, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { ADOBE_CATEGORIES, categoryName } from "../../constants/categories";
 import type { MetadataMode, StockAsset, StockMetadata } from "../../types";
 import { emptyMetadata, qualityScore, validateMetadata } from "../../utils/metadata";
 import { formatDuration, isVideoMime, isVideoPath } from "../../services/video";
+import { VideoFrameModal } from "./VideoFrameModal";
 
 interface InspectorProps {
   asset?: StockAsset;
@@ -14,11 +14,14 @@ interface InspectorProps {
   onUpdate: (assetId: string, metadata: StockMetadata) => void;
   onRegenerate: (assetId: string, scope: "full" | "title" | "keywords") => void;
   onUndo: (assetId: string) => void;
+  onSaveVideoFrames: (assetId: string, times: number[], coverTime: number) => Promise<void>;
 }
 
-export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo }: InspectorProps) {
+export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo, onSaveVideoFrames }: InspectorProps) {
   const [newKeyword, setNewKeyword] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [frameModalOpen, setFrameModalOpen] = useState(false);
+  const [activePreviewTime, setActivePreviewTime] = useState<number>();
   const metadata = useMemo(() => asset?.metadata ?? (asset ? emptyMetadata(asset, mode) : undefined), [asset, mode]);
 
   if (!asset || !metadata) {
@@ -66,8 +69,13 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
   };
 
   const copy = (value: string) => navigator.clipboard.writeText(value).catch(() => undefined);
+  const isVideo = asset.mediaType === "video" || isVideoMime(asset.mimeType) || isVideoPath(asset.path);
+  const framePreviews = isVideo ? asset.videoFramePreviews ?? [] : [];
+  const coverFrame = framePreviews.find((frame) => Math.abs(frame.time - (asset.videoCoverTime ?? framePreviews[0]?.time)) < 0.5);
+  const activeFrame = framePreviews.find((frame) => frame.time === activePreviewTime) ?? coverFrame;
 
   return (
+    <>
     <aside className="flex w-[350px] shrink-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-panel">
       <div className="flex h-[72px] items-center justify-between border-b border-line px-5">
         <div className="flex min-w-0 items-center gap-3">
@@ -88,19 +96,43 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken/20 p-5">
         <div className="flex h-[176px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface-sunken p-2 shadow-sm">
-          {asset.mediaType === "video" || isVideoMime(asset.mimeType) || isVideoPath(asset.path) ? (
-            <video
-              src={convertFileSrc(asset.path)}
-              controls
-              poster={asset.previewUrl}
-              className="max-h-full max-w-full rounded-lg object-contain"
-            />
-          ) : asset.previewUrl ? (
-            <img src={asset.previewUrl} alt={asset.filename} className="max-h-full max-w-full object-contain" />
+          {activeFrame?.imageUrl || asset.previewUrl ? (
+            <img src={activeFrame?.imageUrl ?? asset.previewUrl} alt={activeFrame ? `${asset.filename} pada ${formatDuration(activeFrame.time)}` : asset.filename} className="max-h-full max-w-full object-contain" />
+          ) : isVideo ? (
+            <Film size={28} className="text-accent-300" />
           ) : (
             <FileImage size={28} className="text-accent-300" />
           )}
         </div>
+        {framePreviews.length ? (
+          <div className="mt-3">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-bold text-ink-muted">
+              <span>{asset.videoFrameTimes?.length ? "Titik gambar dipilih" : "Titik gambar otomatis"}</span>
+              <span>{framePreviews.length} gambar</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {framePreviews.map((frame, index) => (
+                <button
+                  key={`${frame.time}-${index}`}
+                  type="button"
+                  className={`relative overflow-hidden rounded-lg border bg-surface-sunken transition-colors ${activeFrame?.time === frame.time ? "border-accent-500 ring-1 ring-accent-500/40" : "border-line hover:border-accent-500/60"}`}
+                  onClick={() => setActivePreviewTime(frame.time)}
+                  aria-label={`Lihat gambar video pada ${formatDuration(frame.time)}${coverFrame?.time === frame.time ? ", gambar utama" : ""}`}
+                  aria-pressed={activeFrame?.time === frame.time}
+                >
+                  <img src={frame.imageUrl} alt="" className="aspect-video w-full object-contain" />
+                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/75 px-1 text-[9px] font-bold tabular-nums text-white">{formatDuration(frame.time)}</span>
+                  {coverFrame?.time === frame.time ? <span className="absolute left-0 top-0 rounded-br bg-accent-600 px-1 text-[8px] font-bold text-white">Utama</span> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {isVideo ? (
+          <button type="button" className="app-button mt-2.5 w-full text-[11px]" onClick={() => setFrameModalOpen(true)} disabled={asset.status === "processing" || asset.status === "preparing"}>
+            <Film size={14} /> Pilih titik gambar video
+          </button>
+        ) : null}
 
         <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-3 shadow-sm">
           <div>
@@ -201,17 +233,23 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
             ))}
           </div>
 
-          <div className="mt-2.5 flex gap-2">
+          <div className="relative mt-2.5">
             <input
-              className="app-input h-8 text-[11px]"
+              className="app-input h-9 pr-11 text-[11px]"
               value={newKeyword}
               onChange={(event) => setNewKeyword(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") addKeyword();
               }}
-              placeholder="Tambah keyword"
+              placeholder="Tambah kata kunci"
             />
-            <button className="app-button app-button-primary h-8 w-8 px-0" onClick={addKeyword} aria-label="Tambah keyword">
+            <button
+              type="button"
+              className="app-button app-button-primary absolute right-1 top-1 h-7 w-7 rounded-lg px-0"
+              onClick={addKeyword}
+              disabled={!newKeyword.trim()}
+              aria-label="Tambah kata kunci"
+            >
               <Plus size={15} />
             </button>
           </div>
@@ -239,39 +277,46 @@ export function Inspector({ asset, mode, onClose, onUpdate, onRegenerate, onUndo
       </div>
 
       <div className="border-t border-line bg-surface p-3.5">
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">Generate ulang</span>
           <button
-            className="app-button h-8 px-1 text-[10px]"
+            className="app-button app-button-quiet h-7 px-2 text-[10px]"
             disabled={!asset.previousMetadata}
             onClick={() => onUndo(asset.id)}
             aria-label={`Urungkan metadata untuk ${asset.filename}`}
           >
             <Undo2 size={12} /> Urung
           </button>
+        </div>
+        <div className="grid grid-cols-[0.8fr_1.1fr_1.5fr] gap-1.5">
           <button
             className="app-button h-8 px-1 text-[10px]"
             onClick={() => onRegenerate(asset.id, "title")}
-            aria-label={`Generate ulang title untuk ${asset.filename}`}
+            aria-label={`Generate ulang judul untuk ${asset.filename}`}
           >
-            <RotateCcw size={12} /> Title
+            <RotateCcw size={12} /> Judul
           </button>
           <button
             className="app-button h-8 px-1 text-[10px]"
             onClick={() => onRegenerate(asset.id, "keywords")}
-            aria-label={`Generate ulang keywords untuk ${asset.filename}`}
+            aria-label={`Generate ulang kata kunci untuk ${asset.filename}`}
           >
-            <RotateCcw size={12} /> Keywords
+            <RotateCcw size={12} /> Kata kunci
           </button>
           <button
             className="app-button app-button-primary h-8 px-1 text-[10px]"
             onClick={() => onRegenerate(asset.id, "full")}
             aria-label={`Generate ulang semua metadata untuk ${asset.filename}`}
           >
-            <RotateCcw size={12} /> Semua
+            <RotateCcw size={12} /> Semua metadata
           </button>
         </div>
       </div>
     </aside>
+    {frameModalOpen && isVideo ? (
+      <VideoFrameModal key={asset.id} asset={asset} onClose={() => setFrameModalOpen(false)} onSave={(times, coverTime) => onSaveVideoFrames(asset.id, times, coverTime)} />
+    ) : null}
+    </>
   );
 }
 

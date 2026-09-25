@@ -1,3 +1,5 @@
+import packageJson from "../../../package.json";
+
 export function SplashScreen() {
   return (
     <main
@@ -24,7 +26,7 @@ export function SplashScreen() {
         </div>
         <p className="mt-4 text-[11px] font-semibold text-ink-muted">Menyiapkan workspace...</p>
         <span className="mt-5 rounded-full border border-accent-300/50 bg-accent-50/80 px-3 py-1 text-[9px] font-extrabold tracking-[0.16em] text-accent-700">
-          VERSI 0.2.0
+          VERSI {packageJson.version}
         </span>
 
       </section>

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Circle, CloudOff, Download, FileWarning, LoaderCircle } from "lucide-react";
+import { AlertTriangle, CloudOff, LoaderCircle } from "lucide-react";
 import packageJson from "../package.json";
 
 import { NoticeStack } from "./components/common/NoticeStack";
 import { GuideModal } from "./components/common/GuideModal";
 import { SplashScreen } from "./components/common/SplashScreen";
+import { ExportDialog } from "./components/common/ExportDialog";
+import { DiscoverSheet } from "./components/common/DiscoverSheet";
 import { LicenseGate } from "./components/common/LicenseGate";
 import { Inspector } from "./components/metadata/Inspector";
 import { MetadataTable } from "./components/metadata/MetadataTable";
@@ -13,14 +15,17 @@ import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { ThemeSheet } from "./components/settings/ThemeSheet";
 import { useAppStore } from "./stores/appStore";
 import { cancelActiveGeneration, runGeneration } from "./services/generation";
-import { activateLicense, checkForAppUpdate, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
+import { activateLicense, checkForAppUpdate, cleanupTempFile, deleteApiKey, exportCsvFile, getLicenseStatus, inspectAssets, isTauri, saveTempImage, scanFolder, setApiKey, testApiKey, chooseFolder, chooseImages, chooseCsvOutput } from "./services/tauri";
 import { readApiKey, removeApiKey, saveApiKey } from "./services/secretStore";
 import { readSettings, writeSettings } from "./services/preferences";
+import { fetchDiscover, readSeenDiscoverIds, writeSeenDiscoverIds } from "./services/discover";
+import type { DiscoverItem } from "./services/discover";
 import { formatTokenCount, readDailyUsage } from "./services/usage";
 import { emptyMetadata, qualityScore, validateMetadata } from "./utils/metadata";
 import { extractVideoMetadataAndStoryboard, isVideoMime, isVideoPath } from "./services/video";
-import { serializeAdobeCsv } from "./utils/csv";
-import type { ApiStatus, CsvExportRequest, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
+import { serializeCsv } from "./utils/csv";
+import { EXPORT_PLATFORMS, suggestShutterstockCategory } from "./constants/exportPlatforms";
+import type { ApiStatus, CsvExportPlatform, CsvExportRequest, CsvExportRow, LicenseStatus, MetadataMode, StockAsset, StockMetadata } from "./types";
 
 export default function App() {
   const assets = useAppStore((state) => state.assets);
@@ -42,14 +47,69 @@ export default function App() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [isAddingAssets, setIsAddingAssets] = useState(false);
-  const [exportIssues, setExportIssues] = useState<string[] | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportIssues, setExportIssues] = useState<string[]>([]);
+  const [exportPlatform, setExportPlatform] = useState<CsvExportPlatform>("adobe");
+  const [shutterstockCategories, setShutterstockCategories] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>();
   const [licenseBusy, setLicenseBusy] = useState(true);
   const [licenseError, setLicenseError] = useState<string>();
   const [updateAvailable, setUpdateAvailable] = useState<string>();
   const [updateBusy, setUpdateBusy] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [discoverItems, setDiscoverItems] = useState<DiscoverItem[]>([]);
+  const [discoverSheetUnreadIds, setDiscoverSheetUnreadIds] = useState<Set<string>>(() => new Set());
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string>();
+  const [seenDiscoverIds, setSeenDiscoverIds] = useState<string[]>(readSeenDiscoverIds);
+  const [discoverRefreshTick, setDiscoverRefreshTick] = useState(0);
+  const seenDiscoverRef = useRef(new Set(seenDiscoverIds));
+  const announcedDiscoverRef = useRef(new Set<string>());
+  const discoverOpenRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const discoverUnreadIds = new Set(discoverItems.filter((item) => !seenDiscoverIds.includes(item.id)).map((item) => item.id));
+
+  useEffect(() => {
+    if (!licenseStatus?.valid) return;
+    const interval = window.setInterval(() => setDiscoverRefreshTick((tick) => tick + 1), 2 * 60 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [licenseStatus?.valid]);
+
+  useEffect(() => {
+    if (!licenseStatus?.valid) return;
+    let active = true;
+    setDiscoverLoading(true);
+    void fetchDiscover()
+      .then((items) => {
+        if (!active) return;
+        setDiscoverItems(items);
+        setDiscoverError(undefined);
+        const newItems = items.filter((item) => !seenDiscoverRef.current.has(item.id) && !announcedDiscoverRef.current.has(item.id));
+        newItems.forEach((item) => announcedDiscoverRef.current.add(item.id));
+        if (newItems.length && discoverOpenRef.current) {
+          setDiscoverSheetUnreadIds((current) => new Set([...current, ...newItems.map((item) => item.id)]));
+        }
+        if (newItems.length && !discoverOpenRef.current) {
+          addNotice("info", `${newItems.length} kabar baru dari Mahes. Buka Discover untuk melihatnya.`);
+        }
+      })
+      .catch((error) => { if (active) setDiscoverError(error instanceof Error ? error.message : String(error)); })
+      .finally(() => { if (active) setDiscoverLoading(false); });
+    return () => { active = false; };
+  }, [licenseStatus?.valid, discoverRefreshTick, addNotice]);
+
+  useEffect(() => {
+    if (!discoverOpen || !discoverItems.length) return;
+    const ids = new Set(seenDiscoverRef.current);
+    discoverItems.forEach((item) => ids.add(item.id));
+    if (ids.size === seenDiscoverRef.current.size) return;
+    seenDiscoverRef.current = ids;
+    const updated = [...ids];
+    setSeenDiscoverIds(updated);
+    writeSeenDiscoverIds(updated);
+  }, [discoverOpen, discoverItems]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setShowSplash(false), 2_500);
@@ -159,14 +219,18 @@ export default function App() {
         .forEach(async (videoAsset) => {
           try {
             const meta = await extractVideoMetadataAndStoryboard(videoAsset.path);
+            const current = useAppStore.getState().assets.find((candidate) => candidate.id === videoAsset.id);
+            if (!current || current.videoFrameTimes?.length) return;
             useAppStore.getState().patchAsset(videoAsset.id, {
               width: meta.width,
               height: meta.height,
               duration: meta.duration,
               previewUrl: meta.thumbnailUrl,
+              videoFramePreviews: meta.framePreviews,
             });
           } catch (err) {
             console.error(`Gagal memuat video preview untuk ${videoAsset.filename}:`, err);
+            useAppStore.getState().addNotice("warning", `${videoAsset.filename}: pratinjau video gagal dibuat. ${err instanceof Error ? err.message : String(err)}`);
           }
         });
     } catch (error) {
@@ -216,6 +280,26 @@ export default function App() {
   };
 
   const updateMetadata = (assetId: string, metadata: StockMetadata) => patchAsset(assetId, { metadata, status: "completed", error: undefined });
+  const saveVideoFrames = async (assetId: string, times: number[], coverTime: number) => {
+    const current = useAppStore.getState();
+    const asset = current.assets.find((candidate) => candidate.id === assetId);
+    if (!asset) throw new Error("Video tidak lagi tersedia di workspace.");
+    if (current.isGenerating) throw new Error("Tunggu proses generate selesai sebelum mengganti titik gambar.");
+    const meta = await extractVideoMetadataAndStoryboard(asset.path, times, coverTime);
+    const storyboardPath = await saveTempImage(meta.storyboardDataUrl, `storyboard-${asset.id}-${Date.now()}.jpg`);
+    current.patchAsset(assetId, {
+      width: meta.width,
+      height: meta.height,
+      duration: meta.duration,
+      previewUrl: meta.thumbnailUrl,
+      storyboardPath,
+      videoFrameTimes: [...times],
+      videoCoverTime: coverTime,
+      videoFramePreviews: meta.framePreviews,
+    });
+    if (asset.storyboardPath) void cleanupTempFile(asset.storyboardPath).catch(console.error);
+    current.addNotice("success", `${times.length} gambar video disimpan. Gambar utama dan storyboard sudah diperbarui.`);
+  };
   const regenerate = (assetId: string, scope: "full" | "title" | "keywords") => { setAssetStatus(assetId, "queued"); setSelectedAssetId(assetId); void runGeneration({ assetIds: [assetId], scope }); };
   const undoRegenerate = (assetId: string) => { const asset = useAppStore.getState().assets.find((candidate) => candidate.id === assetId); if (asset?.previousMetadata) patchAsset(assetId, { metadata: asset.previousMetadata, previousMetadata: undefined, status: "completed", error: undefined }); };
   const bulkEdit = (transform: (metadata: StockMetadata) => StockMetadata) => {
@@ -258,25 +342,33 @@ export default function App() {
       const validation = validateMetadata(asset.filename, asset.metadata);
       return validation.warnings.filter((warning) => warning.severity === "error").map((warning) => `${asset.filename}: ${warning.message}`);
     });
-    if (issues.length) { setExportIssues(issues); return; }
-    void performExport();
+    setExportIssues(issues);
+    setExportOpen(true);
   };
   const performExport = async () => {
-    const rows = assets.filter((asset) => asset.metadata && asset.status === "completed").map((asset) => ({ filename: asset.filename, title: asset.metadata?.title ?? "", keywords: asset.metadata?.keywords ?? [], category: asset.metadata?.category ?? 8, releases: "" }));
+    const rows: CsvExportRow[] = assets.filter((asset) => asset.metadata && asset.status === "completed" && (exportPlatform !== "freepik" || asset.mediaType !== "video")).map((asset) => ({
+      filename: asset.filename, title: asset.metadata!.title, keywords: asset.metadata!.keywords,
+      category: asset.metadata!.category, releases: "",
+      shutterstockCategory: shutterstockCategories[asset.id] ?? suggestShutterstockCategory(asset.metadata!.category),
+    }));
     if (!rows.length) { addNotice("warning", "Belum ada metadata yang selesai untuk di-export."); return; }
     setExporting(true);
+    let completed = false;
     try {
       if (isTauri) {
-        const outputPath = await chooseCsvOutput();
+        const filename = EXPORT_PLATFORMS.find((item) => item.id === exportPlatform)!.filename;
+        const outputPath = await chooseCsvOutput(filename);
         if (!outputPath) return;
-        const request: CsvExportRequest = { outputPath, rows, includeReleases: settings.includeReleases };
+        const request: CsvExportRequest = { outputPath, rows, includeReleases: settings.includeReleases, platform: exportPlatform };
         const result = await exportCsvFile(request);
         addNotice("success", `${result.rowCount} baris berhasil di-export ke ${result.files.length} file CSV.`);
+        completed = true;
       } else {
-        downloadCsv(rows, settings.includeReleases);
+        downloadCsv(rows, exportPlatform, settings.includeReleases);
         addNotice("success", `${rows.length} baris berhasil di-export.`);
+        completed = true;
       }
-    } catch (error) { addNotice("error", error instanceof Error ? error.message : String(error)); } finally { setExporting(false); setExportIssues(null); }
+    } catch (error) { addNotice("error", error instanceof Error ? error.message : String(error)); } finally { setExporting(false); if (completed) setExportOpen(false); }
   };
 
   if (showSplash) return <SplashScreen />;
@@ -294,6 +386,8 @@ export default function App() {
         onOpenThemePicker={() => setThemeSheetOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenGuide={() => setGuideOpen(true)}
+        onOpenDiscover={() => { setDiscoverSheetUnreadIds(new Set(discoverUnreadIds)); discoverOpenRef.current = true; setDiscoverOpen(true); }}
+        discoverUnreadCount={discoverUnreadIds.size}
         metadataMode={settings.metadataMode}
         onModeChange={(metadataMode: MetadataMode) => setSettings({ ...settings, metadataMode })}
         onExport={startExport}
@@ -366,6 +460,7 @@ export default function App() {
             onUpdate={updateMetadata}
             onRegenerate={regenerate}
             onUndo={undoRegenerate}
+            onSaveVideoFrames={saveVideoFrames}
           />
         ) : null}
       </main>
@@ -421,11 +516,26 @@ export default function App() {
         />
       ) : null}
       {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
-      {exportIssues ? (
-        <ExportReviewDialog
+      {discoverOpen ? (
+        <DiscoverSheet
+          items={discoverItems}
+          unreadIds={discoverSheetUnreadIds}
+          loading={discoverLoading}
+          error={discoverError}
+          onRefresh={() => setDiscoverRefreshTick((tick) => tick + 1)}
+          onClose={() => { discoverOpenRef.current = false; setDiscoverOpen(false); }}
+        />
+      ) : null}
+      {exportOpen ? (
+        <ExportDialog
+          assets={assets}
           issues={exportIssues}
+          platform={exportPlatform}
+          categories={shutterstockCategories}
           exporting={exporting}
-          onCancel={() => setExportIssues(null)}
+          onPlatformChange={setExportPlatform}
+          onCategoryChange={(assetId, category) => setShutterstockCategories((current) => ({ ...current, [assetId]: category }))}
+          onClose={() => setExportOpen(false)}
           onExport={() => void performExport()}
         />
       ) : null}
@@ -456,53 +566,13 @@ function ProgressBar({ progress, jobs }: { progress: { total: number; completed:
   );
 }
 
-function ExportReviewDialog({ issues, exporting, onCancel, onExport }: { issues: string[]; exporting: boolean; onCancel: () => void; onExport: () => void }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/35 backdrop-blur-sm">
-      <div className="w-[490px] rounded-2xl border border-line bg-surface p-6 shadow-modal">
-        <div className="flex items-start gap-3.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 shrink-0">
-            <FileWarning size={20} />
-          </div>
-
-          <div>
-            <h2 className="text-[16px] font-extrabold text-ink">Beberapa aset perlu dicek</h2>
-            <p className="mt-1 text-[12px] leading-5 text-ink-secondary">
-              Ada masalah yang bisa membuat baris CSV kurang lengkap. Perbaiki dulu, atau tetap export metadata yang sudah siap.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-line bg-surface-sunken p-3.5">
-          {issues.slice(0, 12).map((issue) => (
-            <p key={issue} className="mb-1.5 flex items-start gap-1.5 text-[11px] leading-5 text-ink">
-              <Circle size={6} fill="currentColor" className="mt-1.5 shrink-0 text-accent-600" />
-              {issue}
-            </p>
-          ))}
-          {issues.length > 12 ? (
-            <p className="text-[11px] font-medium text-ink-muted">+ {issues.length - 12} lainnya</p>
-          ) : null}
-        </div>
-        <div className="mt-5 flex justify-end gap-2.5">
-          <button className="app-button" onClick={onCancel}>
-            Cek dulu
-          </button>
-          <button className="app-button app-button-primary" disabled={exporting} onClick={onExport}>
-            {exporting ? <LoaderCircle size={14} className="animate-spin" /> : <Download size={14} />} Tetap export
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function downloadCsv(rows: { filename: string; title: string; keywords: string[]; category: number; releases?: string }[], includeReleases: boolean) {
-  const csv = serializeAdobeCsv(rows, includeReleases);
+function downloadCsv(rows: CsvExportRow[], platform: CsvExportPlatform, includeReleases: boolean) {
+  const csv = serializeCsv(rows, platform, includeReleases);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "adobe-stock-metadata.csv";
+  anchor.download = EXPORT_PLATFORMS.find((item) => item.id === platform)!.filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }

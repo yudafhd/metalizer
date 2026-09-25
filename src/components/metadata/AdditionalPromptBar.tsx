@@ -19,7 +19,7 @@ export function AdditionalPromptBar({ value, onChange }: AdditionalPromptBarProp
         aria-controls="additional-prompt-input"
       >
         <MessageSquareText size={14} />
-        <span>Konteks AI</span>
+        <span>Custom Prompt</span>
         {value.trim() ? (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-bold tracking-normal text-emerald-700">
             Aktif

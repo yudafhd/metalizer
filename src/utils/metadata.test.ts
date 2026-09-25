@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { chunkItems, panelIds } from "./batching";
 import { serializeAdobeCsv } from "./csv";
-import { normalizeKeywords, prioritizeKeywords, qualityScore, validateMetadata } from "./metadata";
+import { normalizeKeywords, qualityScore, validateMetadata } from "./metadata";
 
 describe("batching", () => {
   it.each([
@@ -28,10 +28,6 @@ describe("metadata normalization", () => {
 
   it("removes obvious spam and trademark terms", () => {
     expect(normalizeKeywords(["pancake", "best", "Nike", "blueberry", "premium"], "asset.jpg")).toEqual(["pancake", "blueberry"]);
-  });
-
-  it("promotes title subjects while keeping the existing order otherwise", () => {
-    expect(prioritizeKeywords(["breakfast", "blueberry", "plate", "pancakes", "sweet"], "Blueberry pancakes on plate")).toEqual(["blueberry", "plate", "pancakes", "breakfast", "sweet"]);
   });
 
   it("flags a long title and invalid category", () => {

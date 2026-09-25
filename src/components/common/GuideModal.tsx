@@ -40,7 +40,7 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
         <div className="min-h-0 overflow-y-auto bg-surface-sunken/20 px-6 py-5">
           <div className="space-y-6">
             {/* Section 1: Alur Kerja Utama */}
-            <div className="rounded-2xl border border-line bg-surface p-5 shadow-panel">
+            <div className="px-1">
               <p className="eyebrow mb-3">Alur Kerja Utama</p>
 
               <div className="divide-y divide-line">
@@ -118,7 +118,7 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
                         lalu buat API key baru.
                       </li>
                       <li>
-                        <div className="my-1 rounded-xl border border-line bg-surface-sunken/60 p-3 text-[11px] leading-relaxed text-ink-secondary">
+                        <div className="my-1 text-[11px] leading-relaxed text-ink-secondary">
                           Panduan langkah demi langkah cara membuat API key dapat dilihat di{" "}
                           <button
                             type="button"
@@ -161,12 +161,13 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
                   <div className="flex-1 space-y-2">
                     <h3 className="text-[14px] font-bold text-ink">Ekspor CSV</h3>
                     <p className="text-[12px] leading-relaxed text-ink-secondary">
-                      Fitur ini menyatukan seluruh judul, kata kunci, dan kategori dari semua gambar ke dalam satu file spreadsheet (<code>.csv</code>) berstandar Adobe Stock. Tujuannya agar Anda tidak perlu mengetik metadata satu per satu di website Adobe Stock—cukup upload file CSV ini sekali saja, dan metadata puluhan hingga ratusan gambar akan otomatis terisi secara massal.
+                      Fitur ini membuat file metadata CSV untuk Adobe Stock, Shutterstock, Pond5, atau Freepik / Magnific dari aset yang sudah selesai. Format kolom disesuaikan dengan situs yang Anda pilih.
                     </p>
                     <ol className="list-decimal space-y-1.5 pl-4 text-[12px] leading-5 text-ink-secondary">
                       <li>Klik tombol <strong>Export CSV</strong> di pojok kanan atas.</li>
+                      <li>Pilih situs tujuan. Untuk Shutterstock, tinjau kategori tiap aset.</li>
                       <li>Pilih lokasi penyimpanan di komputer Anda.</li>
-                      <li>File tersimpan dalam format standar yang siap digunakan.</li>
+                      <li>Unggah aset dan file CSV lewat portal kontributor situs tujuan.</li>
                     </ol>
                   </div>
                 </div>
@@ -191,7 +192,7 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
                       <li>Klik <strong>Upload CSV</strong> dan pilih file CSV yang telah diekspor oleh Metalizer.</li>
                       <li>Semua judul, keyword, dan kategori akan terisi otomatis. Centang opsi Generative AI di website jika karya dibuat dengan AI, lalu klik <strong>Submit</strong>.</li>
                     </ol>
-                    <div className="rounded-xl border border-line bg-surface-sunken/60 p-3 text-[11px] leading-relaxed text-ink-secondary">
+                    <div className="pt-2 text-[11px] leading-relaxed text-ink-secondary">
                       <em>Catatan penting:</em> Nama file dan ekstensi gambar yang diunggah ke Adobe Stock harus sama persis dengan yang ada di dalam CSV agar tidak terjadi error saat pencocokan metadata.
                     </div>
                   </div>
@@ -202,22 +203,22 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
             {/* Section 2: Solusi Kendala (FAQ) */}
             <div className="space-y-3">
               <p className="eyebrow px-1">Solusi Kendala (FAQ)</p>
-              <div className="grid gap-3">
-                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+              <div className="divide-y divide-line">
+                <div className="py-3 first:pt-0">
                   <h4 className="text-[13px] font-bold text-ink">Error 429 / Rate Limit (Too Many Requests)</h4>
                   <p className="mt-1 text-[12px] leading-relaxed text-ink-secondary">
                     Batas request per menit kuota gratis Gemini tercapai. Di menu <strong>Settings</strong>, turunkan <strong>Request bersamaan</strong> ke <code>1</code> dan naikkan <strong>Jumlah per batch</strong> ke <code>4</code> atau <code>6</code>. Tunggu 1 menit lalu coba lagi.
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                <div className="py-3">
                   <h4 className="text-[13px] font-bold text-ink">Error "Invalid API Key"</h4>
                   <p className="mt-1 text-[12px] leading-relaxed text-ink-secondary">
                     Pastikan API key disalin utuh dari Google AI Studio tanpa spasi tambahan di awal atau akhir.
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                <div className="py-3">
                   <h4 className="text-[13px] font-bold text-ink">Pindah Perangkat / Laptop Baru</h4>
                   <p className="mt-1 text-[12px] leading-relaxed text-ink-secondary">
                     Lisensi terikat ke hardware ID perangkat Anda. Jika Anda mengganti perangkat kerja, hubungi tim support kami untuk reset aktivasi lisensi.

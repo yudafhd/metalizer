@@ -1,20 +1,20 @@
 [package]
-name = "adobe-stock-metadata-generator"
-version = "0.2.2"
+name = "metalizer"
+version = "0.2.3"
 description = "A local-first batch metadata generator for Adobe Stock contributors"
 authors = ["Yuda Fhd"]
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "adobe_stock_metadata_generator_lib"
+name = "metalizer_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 guardian-core = { git = "https://github.com/yudafhd/guardian-core", rev = "db6ba26a84447baff26fdcde195afbf1aeeb8e34" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri-plugin-dialog = "2"

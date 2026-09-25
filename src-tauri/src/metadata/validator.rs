@@ -62,10 +62,10 @@ pub fn validate_metadata(
             "warning",
         ));
     }
-    if normalized_keywords.len() < 20 {
+    if normalized_keywords.len() < 15 {
         warnings.push(warning(
             "keywords-ideal-low",
-            "Sebaiknya gunakan 20–35 keyword yang benar-benar relevan",
+            "Sebaiknya gunakan 15–35 keyword yang benar-benar relevan",
             "warning",
         ));
     }

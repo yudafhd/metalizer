@@ -200,28 +200,9 @@ export function SettingsPanel({
             </div>
           </section>
 
-          {/* Usage Today */}
-          <section>
-            <SectionTitle icon={<Activity size={15} />} title="Pemakaian Gemini hari ini" />
-            <div className="mt-3 rounded-2xl border border-line bg-surface-sunken/40 p-4">
-              <div className="grid grid-cols-3 gap-2">
-                <UsageMetric label="Request" value={String(dailyUsage.requests)} />
-                <UsageMetric label="Token masuk" value={formatTokenCount(dailyUsage.promptTokens)} />
-                <UsageMetric label="Token keluar" value={formatTokenCount(dailyUsage.outputTokens)} />
-              </div>
-              <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-2.5">
-                <span className="text-[11px] font-semibold text-ink-secondary">Total token hari ini</span>
-                <span className="text-[13px] font-extrabold text-accent-500">{formatTokenCount(dailyUsage.totalTokens)}</span>
-              </div>
-              <p className="mt-2.5 text-[10px] leading-4 text-ink-muted">
-                Dicatat secara lokal dari respons Gemini yang berhasil hari ini.
-              </p>
-            </div>
-          </section>
-
           {/* Generation Settings */}
           <section>
-            <SectionTitle icon={<Zap size={15} />} title="Parameter Generate" />
+            <SectionTitle icon={<Zap size={15} />} title="Parameter AI Model" />
             <div className="mt-3 space-y-3.5 rounded-2xl border border-line bg-surface-sunken/40 p-4">
               <Field label="Model AI">
                 <select
@@ -297,13 +278,32 @@ export function SettingsPanel({
                   <input
                     className="app-input text-[13px]"
                     type="number"
-                    min={20}
+                    min={15}
                     max={35}
                     value={settings.targetKeywords}
-                    onChange={(event) => update({ targetKeywords: Math.max(20, Math.min(35, Number(event.target.value))) })}
+                    onChange={(event) => update({ targetKeywords: Math.max(15, Math.min(35, Number(event.target.value))) })}
                   />
                 </Field>
               </div>
+            </div>
+          </section>
+
+          {/* Usage Today */}
+          <section>
+            <SectionTitle icon={<Activity size={15} />} title="Pemakaian AI hari ini" />
+            <div className="mt-3 rounded-2xl border border-line bg-surface-sunken/40 p-4">
+              <div className="grid grid-cols-3 gap-2">
+                <UsageMetric label="Request" value={String(dailyUsage.requests)} />
+                <UsageMetric label="Token masuk" value={formatTokenCount(dailyUsage.promptTokens)} />
+                <UsageMetric label="Token keluar" value={formatTokenCount(dailyUsage.outputTokens)} />
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-2.5">
+                <span className="text-[11px] font-semibold text-ink-secondary">Total token hari ini</span>
+                <span className="text-[13px] font-extrabold text-accent-500">{formatTokenCount(dailyUsage.totalTokens)}</span>
+              </div>
+              <p className="mt-2.5 text-[10px] leading-4 text-ink-muted">
+                Dicatat secara lokal dari respons Gemini yang berhasil hari ini.
+              </p>
             </div>
           </section>
 
@@ -356,12 +356,12 @@ export function SettingsPanel({
           <section>
             <div className="rounded-2xl border border-line bg-surface-sunken/40 p-4">
               <ToggleRow
-                label="Sertakan kolom Releases pada CSV"
+                label="Sertakan kolom Releases pada CSV Adobe"
                 value={settings.includeReleases}
                 onChange={(value) => update({ includeReleases: value })}
               />
               <p className="mt-2.5 text-[11px] leading-5 text-ink-muted">
-                File CSV di-encode dengan UTF-8 standar Adobe Stock. Export batch besar otomatis dibagi per 5.000 baris.
+                CSV menggunakan UTF-8. Kolom Releases hanya berlaku untuk Adobe Stock. Export batch besar otomatis dibagi per 5.000 baris.
               </p>
             </div>
           </section>

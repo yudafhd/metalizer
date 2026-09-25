@@ -118,10 +118,31 @@ fn read_eps_dimensions(path: &Path) -> AppResult<(u32, u32)> {
     Ok((preview.width(), preview.height()))
 }
 
+#[derive(Clone, Copy)]
+struct EpsBounds {
+    llx: f32,
+    lly: f32,
+    urx: f32,
+    ury: f32,
+}
+
+impl EpsBounds {
+    fn dimensions(self) -> (u32, u32) {
+        (
+            (self.urx - self.llx).round() as u32,
+            (self.ury - self.lly).round() as u32,
+        )
+    }
+}
+
 fn parse_eps_bounding_box(ps_data: &[u8]) -> Option<(u32, u32)> {
-    let check_chunk = |chunk: &[u8]| -> Option<(u32, u32)> {
+    parse_eps_bounds(ps_data).map(EpsBounds::dimensions)
+}
+
+fn parse_eps_bounds(ps_data: &[u8]) -> Option<EpsBounds> {
+    let check_chunk = |chunk: &[u8]| -> Option<EpsBounds> {
         let text = String::from_utf8_lossy(chunk);
-        let mut best: Option<(u32, u32)> = None;
+        let mut best: Option<EpsBounds> = None;
 
         for line in text.lines() {
             let trimmed = line.trim();
@@ -145,13 +166,15 @@ fn parse_eps_bounding_box(ps_data: &[u8]) -> Option<(u32, u32)> {
                 parse_num(parts[2]),
                 parse_num(parts[3]),
             ) {
-                let width = (urx - llx).abs().round() as u32;
-                let height = (ury - lly).abs().round() as u32;
-                if width > 0 && height > 0 {
+                if llx.is_finite() && lly.is_finite() && urx.is_finite() && ury.is_finite()
+                    && urx > llx && ury > lly
+                    && (urx - llx).round() >= 1.0 && (ury - lly).round() >= 1.0
+                {
+                    let bounds = EpsBounds { llx, lly, urx, ury };
                     if is_hires {
-                        return Some((width, height));
+                        return Some(bounds);
                     }
-                    best = Some((width, height));
+                    best = Some(bounds);
                 }
             }
         }
@@ -198,8 +221,8 @@ fn extract_eps_preview(data: &[u8]) -> AppResult<DynamicImage> {
     }
 
     // 4. Fallback: render instruksi path vektor PostScript (seperti file dari Canvas Vector Recorder)
-    if let Some((width, height)) = parse_eps_bounding_box(data) {
-        if let Some(svg_data) = convert_eps_to_svg_data(data, width, height) {
+    if let Some(bounds) = parse_eps_bounds(data) {
+        if let Some(svg_data) = convert_eps_to_svg_data(data, bounds) {
             if let Ok(tree) = usvg::Tree::from_data(&svg_data, &usvg::Options::default()) {
                 if let Ok(image) = render_usvg_tree(&tree, Some(2048)) {
                     return Ok(image);
@@ -324,7 +347,7 @@ struct GState {
     opened_tags: usize,
 }
 
-fn convert_eps_to_svg_data(data: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
+fn convert_eps_to_svg_data(data: &[u8], bounds: EpsBounds) -> Option<Vec<u8>> {
     let text = String::from_utf8_lossy(data);
     let mut tokens = Vec::new();
     for line in text.lines() {
@@ -354,10 +377,12 @@ fn convert_eps_to_svg_data(data: &[u8], width: u32, height: u32) -> Option<Vec<u
         return None;
     }
 
+    let (width, height) = bounds.dimensions();
     let mut svg = String::with_capacity(data.len());
+    // PostScript uses a bottom-left origin; SVG uses a top-left origin.
     svg.push_str(&format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}" width="{}" height="{}">"#,
-        width, height, width, height
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}" width="{}" height="{}"><g transform="translate({} {}) scale(1 -1)">"#,
+        width, height, width, height, -bounds.llx, bounds.ury
     ));
 
     let mut stack: Vec<String> = Vec::new();
@@ -533,7 +558,7 @@ fn convert_eps_to_svg_data(data: &[u8], width: u32, height: u32) -> Option<Vec<u
     for _ in 0..root_opened_tags {
         svg.push_str("</g>");
     }
-    svg.push_str("</svg>");
+    svg.push_str("</g></svg>");
 
     Some(svg.into_bytes())
 }

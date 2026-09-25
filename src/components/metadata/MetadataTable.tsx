@@ -99,7 +99,7 @@ export function MetadataTable({
             className="app-button app-button-primary h-8 px-2.5 text-[11px]"
             disabled={isAddingAssets}
             onClick={onChoose}
-            title="Pilih file gambar"
+            title="Pilih gambar atau video"
           >
             {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <Images size={13} />} {isAddingAssets ? "Memuat..." : "Tambah"}
           </button>
@@ -107,7 +107,7 @@ export function MetadataTable({
             className="app-button h-8 px-2.5 text-[11px]"
             disabled={isAddingAssets}
             onClick={() => void onAddFolder()}
-            title="Pilih folder gambar"
+            title="Pilih folder gambar atau video"
           >
             {isAddingAssets ? <LoaderCircle size={13} className="animate-spin" /> : <FolderOpen size={13} />} {isAddingAssets ? "Membaca..." : "Folder"}
           </button>
@@ -444,14 +444,24 @@ function TableEmpty({ onDrop, onChoose }: { onDrop: (event: React.DragEvent<HTML
     <div className="flex h-full items-center justify-center bg-surface-sunken/40" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <div className="max-w-[410px] rounded-2xl border border-dashed border-accent-200 bg-surface px-8 py-8 text-center shadow-panel">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-50 text-accent-600 shadow-sm">
-          <ImagePlus size={22} />
+          <Images size={22} />
         </div>
-        <h2 className="mt-4 text-[17px] font-extrabold text-ink">Tambahkan gambar pertama</h2>
+        <h2 className="mt-4 text-[17px] font-extrabold text-ink">Tambah gambar atau video</h2>
         <p className="mt-2 text-[12px] leading-6 text-ink-muted">
-          Tarik file JPG, PNG, WebP, SVG, atau EPS ke sini, atau klik tombol di bawah untuk mulai membuat metadata.
+          Tarik file ke sini atau pilih dari perangkat.
         </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-left">
+          <div className="rounded-xl border border-line bg-surface-sunken/60 p-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-ink"><FileImage size={15} className="text-accent-600" /> Gambar</div>
+            <p className="mt-1 text-[10px] leading-4 text-ink-muted">JPG, PNG, WebP, SVG, EPS</p>
+          </div>
+          <div className="rounded-xl border border-line bg-surface-sunken/60 p-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-ink"><Video size={15} className="text-accent-600" /> Video</div>
+            <p className="mt-1 text-[10px] leading-4 text-ink-muted">MP4, MOV, WebM, M4V</p>
+          </div>
+        </div>
         <button className="app-button app-button-primary mt-5 h-9 px-5 text-[11px]" onClick={onChoose}>
-          <ImagePlus size={14} /> Pilih gambar
+          <ImagePlus size={14} /> Pilih file
         </button>
       </div>
     </div>

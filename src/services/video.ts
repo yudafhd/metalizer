@@ -6,6 +6,16 @@ export interface VideoMetadataResult {
   duration: number;
   thumbnailUrl: string;
   storyboardDataUrl: string;
+  framePreviews: { time: number; imageUrl: string }[];
+}
+
+export const MAX_VIDEO_FRAMES = 6;
+
+export function suggestedVideoFrameTimes(duration: number): number[] {
+  const percentages = duration >= 30
+    ? [0.07, 0.24, 0.41, 0.59, 0.76, 0.93]
+    : [0.1, 0.35, 0.65, 0.9];
+  return percentages.map((percentage) => percentage * duration);
 }
 
 export function isVideoMime(mimeType?: string): boolean {
@@ -25,28 +35,64 @@ export function formatDuration(seconds?: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function seekToTime(video: HTMLVideoElement, time: number): Promise<void> {
-  return new Promise((resolve) => {
-    let resolved = false;
-    const onSeeked = () => {
-      if (resolved) return;
-      resolved = true;
-      video.removeEventListener("seeked", onSeeked);
-      resolve();
+export function seekToTime(video: HTMLVideoElement, time: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => finish(new Error(`Gagal mengambil frame pada detik ${time.toFixed(1)}.`)), 5000);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      video.removeEventListener("seeked", onReady);
+      video.removeEventListener("loadeddata", onReady);
+      video.removeEventListener("error", onError);
     };
-
-    video.addEventListener("seeked", onSeeked, { once: true });
-    video.currentTime = Math.max(0, Math.min(time, video.duration || time));
-
-    // Fallback timeout in case seeked doesn't fire
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        video.removeEventListener("seeked", onSeeked);
-        resolve();
+    const finish = (error?: Error) => {
+      cleanup();
+      if (error) reject(error);
+      else resolve();
+    };
+    const onReady = () => {
+      if (!video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && Math.abs(video.currentTime - time) < 0.25) {
+        finish();
       }
-    }, 1500);
+    };
+    const onError = () => finish(new Error("Gagal mendekode frame video."));
+
+    video.addEventListener("seeked", onReady);
+    video.addEventListener("loadeddata", onReady);
+    video.addEventListener("error", onError);
+    try {
+      video.currentTime = time;
+      onReady();
+    } catch {
+      finish(new Error(`Tidak dapat menuju detik ${time.toFixed(1)} pada video.`));
+    }
   });
+}
+
+export function captureVideoFrame(video: HTMLVideoElement, width = 320, height = 180): string {
+  if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    throw new Error("Frame video belum siap. Tunggu sebentar lalu coba lagi.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas untuk frame video tidak tersedia.");
+  drawContainedFrame(context, video, width, height);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+function drawContainedFrame(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+): void {
+  context.fillStyle = "#0f172a";
+  context.fillRect(0, 0, width, height);
+  const scale = Math.min(width / video.videoWidth, height / video.videoHeight);
+  const drawnWidth = video.videoWidth * scale;
+  const drawnHeight = video.videoHeight * scale;
+  context.drawImage(video, (width - drawnWidth) / 2, (height - drawnHeight) / 2, drawnWidth, drawnHeight);
 }
 
 function createStoryboardGrid(
@@ -55,8 +101,8 @@ function createStoryboardGrid(
   targetCellHeight = 360,
 ): HTMLCanvasElement {
   const gap = 4;
-  const cols = 2;
-  const rows = 2;
+  const cols = frames.length > 4 ? 3 : frames.length > 1 ? 2 : 1;
+  const rows = Math.ceil(frames.length / cols);
   const totalWidth = targetCellWidth * cols + gap * (cols + 1);
   const totalHeight = targetCellHeight * rows + gap * (rows + 1);
 
@@ -64,13 +110,13 @@ function createStoryboardGrid(
   collage.width = totalWidth;
   collage.height = totalHeight;
   const ctx = collage.getContext("2d");
-  if (!ctx) return collage;
+  if (!ctx) throw new Error("Canvas untuk storyboard video tidak tersedia.");
 
   // Background
   ctx.fillStyle = "#1e293b";
   ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-  frames.slice(0, 4).forEach((frame, index) => {
+  frames.forEach((frame, index) => {
     const col = index % cols;
     const row = Math.floor(index / cols);
     const x = gap + col * (targetCellWidth + gap);
@@ -104,104 +150,88 @@ function createStoryboardGrid(
 
 export async function extractVideoMetadataAndStoryboard(
   filePath: string,
-  sampleCount = 4,
+  frameTimes?: number[],
+  coverTime?: number,
 ): Promise<VideoMetadataResult> {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement("video");
-    video.preload = "auto";
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
+  const video = document.createElement("video");
+  video.preload = "auto";
+  video.muted = true;
+  video.playsInline = true;
+  video.crossOrigin = "anonymous";
 
-    const assetUrl = convertFileSrc(filePath);
-    video.src = assetUrl;
-
-    let cleanupDone = false;
-    const cleanup = () => {
-      if (cleanupDone) return;
-      cleanupDone = true;
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    };
-
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error("Gagal membaca video: waktu tunggu habis (timeout)."));
-    }, 15000);
-
-    video.onerror = () => {
-      clearTimeout(timeout);
-      cleanup();
-      reject(new Error("Format atau codec video tidak didukung oleh pemutar sistem."));
-    };
-
-    video.onloadedmetadata = async () => {
-      try {
-        const width = video.videoWidth || 1920;
-        const height = video.videoHeight || 1080;
-        const duration = Math.max(0.1, video.duration || 1);
-
-        // Relative sampling points (e.g. 10%, 35%, 65%, 90%)
-        const percentages =
-          sampleCount === 4
-            ? [0.1, 0.35, 0.65, 0.9]
-            : Array.from({ length: sampleCount }, (_, i) => (i + 1) / (sampleCount + 1));
-
-        const sampleTimes = percentages.map((pct) => pct * duration);
-        const cellWidth = 640;
-        const cellHeight = Math.max(200, Math.round((cellWidth * height) / width));
-
-        const extractedFrames: { canvas: HTMLCanvasElement; timestamp: string }[] = [];
-
-        for (const time of sampleTimes) {
-          await seekToTime(video, time);
-          const frameCanvas = document.createElement("canvas");
-          frameCanvas.width = cellWidth;
-          frameCanvas.height = cellHeight;
-          const frameCtx = frameCanvas.getContext("2d");
-          if (frameCtx) {
-            frameCtx.drawImage(video, 0, 0, cellWidth, cellHeight);
-            extractedFrames.push({
-              canvas: frameCanvas,
-              timestamp: formatDuration(time),
-            });
-          }
-        }
-
-        clearTimeout(timeout);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => finish(new Error("Gagal membaca metadata video: waktu tunggu habis.")), 15000);
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        video.removeEventListener("loadedmetadata", onLoaded);
+        video.removeEventListener("error", onError);
+      };
+      const finish = (error?: Error) => {
         cleanup();
+        if (error) reject(error);
+        else resolve();
+      };
+      const onLoaded = () => finish();
+      const onError = () => finish(new Error("Format atau codec video tidak didukung oleh pemutar sistem."));
+      video.addEventListener("loadedmetadata", onLoaded);
+      video.addEventListener("error", onError);
+      video.src = convertFileSrc(filePath);
+    });
 
-        if (!extractedFrames.length) {
-          throw new Error("Gagal mengekstrak frame dari video.");
-        }
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    const duration = video.duration;
+    if (width <= 0 || height <= 0 || !Number.isFinite(duration) || duration <= 0) {
+      throw new Error("Dimensi atau durasi video tidak valid.");
+    }
 
-        // Thumbnail: scale down the first frame
-        const thumbCanvas = document.createElement("canvas");
-        thumbCanvas.width = 320;
-        thumbCanvas.height = Math.max(100, Math.round((320 * height) / width));
-        const thumbCtx = thumbCanvas.getContext("2d");
-        if (thumbCtx) {
-          thumbCtx.drawImage(extractedFrames[0].canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-        }
-        const thumbnailUrl = thumbCanvas.toDataURL("image/jpeg", 0.85);
+    const times = frameTimes?.length
+      ? frameTimes.slice(0, MAX_VIDEO_FRAMES).map((time) => Math.max(0, Math.min(time, duration - 0.05)))
+      : suggestedVideoFrameTimes(duration);
+    const cellWidth = 640;
+    const cellHeight = 360;
+    const extractedFrames: { canvas: HTMLCanvasElement; timestamp: string }[] = [];
+    const framePreviews: VideoMetadataResult["framePreviews"] = [];
 
-        // Storyboard 2x2 collage
-        const storyboardCanvas = createStoryboardGrid(extractedFrames, cellWidth, cellHeight);
-        const storyboardDataUrl = storyboardCanvas.toDataURL("image/jpeg", 0.85);
+    for (const time of times) {
+      await seekToTime(video, time);
+      const frameCanvas = document.createElement("canvas");
+      frameCanvas.width = cellWidth;
+      frameCanvas.height = cellHeight;
+      const frameCtx = frameCanvas.getContext("2d");
+      if (!frameCtx) throw new Error("Canvas untuk frame video tidak tersedia.");
+      drawContainedFrame(frameCtx, video, cellWidth, cellHeight);
+      extractedFrames.push({ canvas: frameCanvas, timestamp: formatDuration(video.currentTime) });
+      const previewCanvas = document.createElement("canvas");
+      previewCanvas.width = 320;
+      previewCanvas.height = 180;
+      const previewCtx = previewCanvas.getContext("2d");
+      if (!previewCtx) throw new Error("Canvas untuk pratinjau frame tidak tersedia.");
+      previewCtx.drawImage(frameCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+      framePreviews.push({ time, imageUrl: previewCanvas.toDataURL("image/jpeg", 0.8) });
+    }
 
-        resolve({
-          width,
-          height,
-          duration,
-          thumbnailUrl,
-          storyboardDataUrl,
-        });
-      } catch (error) {
-        clearTimeout(timeout);
-        cleanup();
-        reject(error);
-      }
+    const thumbCanvas = document.createElement("canvas");
+    thumbCanvas.width = 320;
+    thumbCanvas.height = 180;
+    const thumbCtx = thumbCanvas.getContext("2d");
+    if (!thumbCtx) throw new Error("Canvas untuk thumbnail video tidak tersedia.");
+    const coverIndex = coverTime === undefined ? 0 : times.findIndex((time) => Math.abs(time - coverTime) < 0.5);
+    thumbCtx.drawImage(extractedFrames[Math.max(0, coverIndex)].canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+    const storyboardCanvas = createStoryboardGrid(extractedFrames, cellWidth, cellHeight);
+    return {
+      width,
+      height,
+      duration,
+      thumbnailUrl: thumbCanvas.toDataURL("image/jpeg", 0.85),
+      storyboardDataUrl: storyboardCanvas.toDataURL("image/jpeg", 0.85),
+      framePreviews,
     };
-  });
+  } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
 }

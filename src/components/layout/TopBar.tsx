@@ -1,4 +1,4 @@
-import { BookOpen, Check, ChevronDown, Download, Palette, Settings2, Sparkles, Square } from "lucide-react";
+import { Bell, BookOpen, Check, ChevronDown, Download, Palette, Settings2, Sparkles, Square } from "lucide-react";
 import { useState } from "react";
 import type { MetadataMode } from "../../types";
 import { openUrl } from "../../services/tauri";
@@ -14,6 +14,8 @@ interface TopBarProps {
   onOpenThemePicker: () => void;
   onOpenSettings: () => void;
   onOpenGuide: () => void;
+  onOpenDiscover: () => void;
+  discoverUnreadCount: number;
   metadataMode: MetadataMode;
   onModeChange: (mode: MetadataMode) => void;
   onExport: () => void;
@@ -30,6 +32,8 @@ export function TopBar({
   onOpenThemePicker,
   onOpenSettings,
   onOpenGuide,
+  onOpenDiscover,
+  discoverUnreadCount,
   metadataMode,
   onModeChange,
   onExport,
@@ -148,6 +152,21 @@ export function TopBar({
         )}
 
         {/* Theme Button placed to the left of the Guide button */}
+        <button
+          type="button"
+          className="app-button app-button-quiet relative h-9 w-9 px-0"
+          onClick={onOpenDiscover}
+          title={discoverUnreadCount ? `${discoverUnreadCount} kabar baru dari Mahes` : "Buka Discover"}
+          aria-label={discoverUnreadCount ? `Buka Discover, ${discoverUnreadCount} kabar baru` : "Buka Discover"}
+        >
+          <Bell size={17} className={discoverUnreadCount ? "discover-bell-shake text-accent-600" : ""} />
+          {discoverUnreadCount ? (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-extrabold text-white shadow-sm">
+              {discoverUnreadCount > 9 ? "9+" : discoverUnreadCount}
+            </span>
+          ) : null}
+        </button>
+
         <button
           className="app-button app-button-quiet h-9 w-9 px-0"
           onClick={onOpenThemePicker}

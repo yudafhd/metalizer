@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Default Primary Theme: Cosmic Nebula */
+  /* Default Primary Theme: Obsidian Dark */
   --ink: 242 232 240;
   --ink-secondary: 220 202 222;
   --ink-muted: 184 142 188;
@@ -58,8 +58,7 @@
    ✨ FANTASY & 3-COLOR APPLE GRADIENTS (Vibrant, Magis & Spektrum)
    ========================================================================== */
 
-:root[data-theme="nebula"],
-:root:not([data-theme]) {
+:root[data-theme="nebula"] {
   --ink: 242 232 240;
   --ink-secondary: 220 202 222;
   --ink-muted: 184 142 188;
@@ -220,8 +219,7 @@
 }
 
 /* Tri-Color Gradient Primary Buttons for Special Themes */
-:root[data-theme="nebula"] .app-button-primary,
-:root:not([data-theme]) .app-button-primary {
+:root[data-theme="nebula"] .app-button-primary {
   background-image: linear-gradient(135deg, #f43f5e 0%, #a855f7 50%, #3b82f6 100%) !important;
   border-color: #f43f5e !important;
 }
@@ -246,7 +244,8 @@
    DARK & DIM THEMES (Tidak Silau / Gelap & Redup)
    ========================================================================== */
 
-:root[data-theme="obsidian"] {
+:root[data-theme="obsidian"],
+:root:not([data-theme]) {
   --ink: 232 238 244;
   --ink-secondary: 190 198 208;
   --ink-muted: 130 140 152;
@@ -803,6 +802,16 @@ body {
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+
+@keyframes discover-bell-shake {
+  0%, 83%, 100% { transform: rotate(0deg); }
+  86%, 94% { transform: rotate(16deg); }
+  90%, 98% { transform: rotate(-16deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .discover-bell-shake { transform-origin: top center; animation: discover-bell-shake 3s ease-in-out infinite; }
+}
 
 /* Remove password reveal eye in WebView2 */
 input[type="password"]::-ms-reveal,

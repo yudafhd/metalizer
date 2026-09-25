@@ -12,8 +12,8 @@ use crate::models::{ContactSheetRequest, ContactSheetResult};
 use crate::images::contact_sheet::create_contact_sheet as build_contact_sheet;
 
 #[command]
-pub async fn inspect_assets(paths: Vec<String>) -> Result<Vec<AssetDescriptor>, String> {
-    tokio::task::spawn_blocking(move || inspect_paths(paths))
+pub async fn inspect_assets(app: AppHandle, paths: Vec<String>) -> Result<Vec<AssetDescriptor>, String> {
+    tokio::task::spawn_blocking(move || inspect_paths(paths, Some(&app)))
         .await
         .map_err(|error| error.to_string())?
         .map_err(command_error)
@@ -36,7 +36,7 @@ fn scan_folder_sync(path: String) -> AppResult<FolderImageResult> {
     }
     let mut paths = Vec::new();
     collect_file_paths(&root, &mut paths)?;
-    let assets = inspect_paths(paths.iter().map(|path| path.to_string_lossy().into_owned()).collect())
+    let assets = inspect_paths(paths.iter().map(|path| path.to_string_lossy().into_owned()).collect(), None)
         ?;
     let valid_count = assets.len();
     Ok(FolderImageResult {
@@ -61,7 +61,7 @@ pub async fn create_contact_sheet(
         .map_err(command_error)
 }
 
-fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
+fn inspect_paths(paths: Vec<String>, app: Option<&AppHandle>) -> AppResult<Vec<AssetDescriptor>> {
     let mut seen = HashSet::new();
     let mut assets = Vec::new();
     for raw_path in paths {
@@ -83,6 +83,13 @@ fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
         let Some(filename) = Path::new(&normalized).file_name().and_then(|value| value.to_str()) else {
             continue;
         };
+        if mime_type.starts_with("video/") {
+            if let Some(app) = app {
+                app.asset_protocol_scope()
+                    .allow_file(&normalized)
+                    .map_err(|error| AppError::InvalidRequest(error.to_string()))?;
+            }
+        }
         assets.push(AssetDescriptor {
             id: Uuid::new_v4().to_string(),
             filename: filename.to_string(),
@@ -99,7 +106,17 @@ fn inspect_paths(paths: Vec<String>) -> AppResult<Vec<AssetDescriptor>> {
 
 fn normalize_path(path: &Path) -> AppResult<String> {
     let canonical = path.canonicalize()?;
-    Ok(canonical.to_string_lossy().into_owned())
+    let normalized = canonical.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    {
+        if let Some(unc_path) = normalized.strip_prefix(r"\\?\UNC\") {
+            return Ok(format!(r"\\{}", unc_path));
+        }
+        if let Some(drive_path) = normalized.strip_prefix(r"\\?\") {
+            return Ok(drive_path.to_string());
+        }
+    }
+    Ok(normalized)
 }
 
 fn collect_file_paths(root: &Path, output: &mut Vec<PathBuf>) -> AppResult<()> {

@@ -70,20 +70,28 @@ fn manager(app: &AppHandle) -> Result<LicenseManager<JsonFileStore>, String> {
 }
 
 #[command]
-pub fn license_status(app: AppHandle) -> Result<LicenseStatus, String> {
-    manager(&app).and_then(|value| value.status(trusted_now()).map_err(|e| e.to_string()))
+pub async fn license_status(app: AppHandle) -> Result<LicenseStatus, String> {
+    tokio::task::spawn_blocking(move || {
+        manager(&app).and_then(|value| value.status(trusted_now()).map_err(|e| e.to_string()))
+    })
+    .await
+    .map_err(|error| format!("Pemeriksaan lisensi gagal dijalankan: {error}"))?
 }
 
 #[command]
-pub fn activate_license(app: AppHandle, license_code: String, email: String) -> Result<LicenseStatus, String> {
-    let email = email.trim();
+pub async fn activate_license(app: AppHandle, license_code: String, email: String) -> Result<LicenseStatus, String> {
+    let email = email.trim().to_string();
     if email.is_empty() || !email.contains('@') {
         return Err("Masukkan email yang valid.".into());
     }
     if license_code.trim().is_empty() {
         return Err("Masukkan kode lisensi.".into());
     }
-    manager(&app)?.activate(license_code.trim(), email, trusted_now()).map_err(|e| e.to_string())
+    tokio::task::spawn_blocking(move || {
+        manager(&app)?.activate(license_code.trim(), &email, trusted_now()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| format!("Aktivasi lisensi gagal dijalankan: {error}"))?
 }
 
 pub fn require_license(app: &AppHandle) -> Result<(), String> {

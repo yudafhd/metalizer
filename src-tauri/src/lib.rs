@@ -1,5 +1,3 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 mod ai;
 mod commands;
 mod csv;
@@ -49,6 +47,7 @@ pub fn run() {
             commands::assets::inspect_assets,
             commands::assets::scan_folder,
             commands::assets::create_contact_sheet,
+            commands::discover::get_discover,
             commands::ai::generate_metadata,
             commands::ai::cancel_generation,
             commands::ai::set_api_key,

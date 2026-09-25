@@ -15,32 +15,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
-name = "adobe-stock-metadata-generator"
-version = "0.2.2"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "csv",
- "guardian-core",
- "image",
- "reqwest 0.12.28",
- "resvg",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-store",
- "tauri-plugin-stronghold",
- "tauri-plugin-updater",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "uuid",
- "zeroize",
-]
-
-[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1934,6 +1908,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-range"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21dec9db110f5f872ed9699c3ecf50cf16f423502706ba5c72462e28d3157573"
+
+[[package]]
 name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2684,6 +2664,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "metalizer"
+version = "0.2.3"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "csv",
+ "guardian-core",
+ "image",
+ "reqwest 0.12.28",
+ "resvg",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-store",
+ "tauri-plugin-stronghold",
+ "tauri-plugin-updater",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -4749,6 +4755,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "http-range",
  "jni 0.21.1",
  "libc",
  "log",

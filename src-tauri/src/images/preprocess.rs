@@ -207,6 +207,9 @@ fn extract_eps_preview(data: &[u8]) -> AppResult<DynamicImage> {
             if let Ok(image) = image::load_from_memory_with_format(tiff_data, ImageFormat::Tiff) {
                 return Ok(image);
             }
+            if let Some(image) = decode_uncompressed_palette_tiff(tiff_data) {
+                return Ok(image);
+            }
         }
     }
 
@@ -221,11 +224,13 @@ fn extract_eps_preview(data: &[u8]) -> AppResult<DynamicImage> {
     }
 
     // 4. Fallback: render instruksi path vektor PostScript (seperti file dari Canvas Vector Recorder)
-    if let Some(bounds) = parse_eps_bounds(data) {
-        if let Some(svg_data) = convert_eps_to_svg_data(data, bounds) {
-            if let Ok(tree) = usvg::Tree::from_data(&svg_data, &usvg::Options::default()) {
-                if let Ok(image) = render_usvg_tree(&tree, Some(2048)) {
-                    return Ok(image);
+    if !is_adobe_illustrator_file(data) {
+        if let Some(bounds) = parse_eps_bounds(data) {
+            if let Some(svg_data) = convert_eps_to_svg_data(data, bounds) {
+                if let Ok(tree) = usvg::Tree::from_data(&svg_data, &usvg::Options::default()) {
+                    if let Ok(image) = render_usvg_tree(&tree, Some(2048)) {
+                        return Ok(image);
+                    }
                 }
             }
         }
@@ -234,6 +239,14 @@ fn extract_eps_preview(data: &[u8]) -> AppResult<DynamicImage> {
     Err(AppError::InvalidRequest(
         "File EPS tidak memiliki embedded preview (TIFF atau XMP) dan tidak dapat dirender secara vektor. Pastikan opsi preview (TIFF 8-bit) diaktifkan saat menyimpan file EPS di Adobe Illustrator.".to_string(),
     ))
+}
+
+fn is_adobe_illustrator_file(data: &[u8]) -> bool {
+    let head_limit = data.len().min(8192);
+    let head = &data[..head_limit];
+    find_subsequence(head, b"Adobe Illustrator").is_some()
+        || find_subsequence(head, b"%%AI8_CreatorVersion:").is_some()
+        || find_subsequence(head, b"%%AI9_PrintingDataBegin").is_some()
 }
 
 fn extract_xmp_thumbnail(data: &[u8]) -> Option<DynamicImage> {
@@ -248,9 +261,16 @@ fn extract_xmp_thumbnail(data: &[u8]) -> Option<DynamicImage> {
             if let Some(end_rel) = find_subsequence(&data[content_start..], end_tag) {
                 let content_end = content_start + end_rel;
                 let raw_b64 = &data[content_start..content_end];
-                let cleaned: Vec<u8> = raw_b64
-                    .iter()
-                    .copied()
+                let text = String::from_utf8_lossy(raw_b64);
+                let stripped = text
+                    .replace("&#xA;", "")
+                    .replace("&#xa;", "")
+                    .replace("&#xD;", "")
+                    .replace("&#xd;", "")
+                    .replace("&#10;", "")
+                    .replace("&#13;", "");
+                let cleaned: Vec<u8> = stripped
+                    .bytes()
                     .filter(|byte| !byte.is_ascii_whitespace())
                     .collect();
                 if let Ok(jpeg_bytes) = STANDARD.decode(&cleaned) {
@@ -262,6 +282,157 @@ fn extract_xmp_thumbnail(data: &[u8]) -> Option<DynamicImage> {
         }
     }
     None
+}
+
+fn decode_uncompressed_palette_tiff(data: &[u8]) -> Option<DynamicImage> {
+    if data.len() < 8 {
+        return None;
+    }
+    let is_le = match &data[0..2] {
+        b"II" => true,
+        b"MM" => false,
+        _ => return None,
+    };
+
+    let read_u16 = |buf: &[u8], offset: usize| -> Option<u16> {
+        let slice = buf.get(offset..offset + 2)?;
+        Some(if is_le {
+            u16::from_le_bytes(slice.try_into().unwrap())
+        } else {
+            u16::from_be_bytes(slice.try_into().unwrap())
+        })
+    };
+
+    let read_u32 = |buf: &[u8], offset: usize| -> Option<u32> {
+        let slice = buf.get(offset..offset + 4)?;
+        Some(if is_le {
+            u32::from_le_bytes(slice.try_into().unwrap())
+        } else {
+            u32::from_be_bytes(slice.try_into().unwrap())
+        })
+    };
+
+    let version = read_u16(data, 2)?;
+    if version != 42 {
+        return None;
+    }
+
+    let ifd_offset = read_u32(data, 4)? as usize;
+    let num_entries = read_u16(data, ifd_offset)? as usize;
+
+    let mut width: Option<u32> = None;
+    let mut height: Option<u32> = None;
+    let mut compression = 1u16;
+    let mut photometric = 0u16;
+    let mut samples_per_pixel = 1u16;
+    let mut strip_offsets = Vec::new();
+    let mut strip_byte_counts = Vec::new();
+    let mut colormap_offset: Option<usize> = None;
+    let mut colormap_count: usize = 0;
+
+    for i in 0..num_entries {
+        let entry_offset = ifd_offset + 2 + i * 12;
+        let tag = read_u16(data, entry_offset)?;
+        let typ = read_u16(data, entry_offset + 2)?;
+        let count = read_u32(data, entry_offset + 4)? as usize;
+        let val_or_offset = read_u32(data, entry_offset + 8)?;
+
+        match tag {
+            256 => width = Some(if typ == 3 { val_or_offset & 0xFFFF } else { val_or_offset }),
+            257 => height = Some(if typ == 3 { val_or_offset & 0xFFFF } else { val_or_offset }),
+            259 => compression = (val_or_offset & 0xFFFF) as u16,
+            262 => photometric = (val_or_offset & 0xFFFF) as u16,
+            277 => samples_per_pixel = (val_or_offset & 0xFFFF) as u16,
+            273 => {
+                if count == 1 {
+                    strip_offsets.push(val_or_offset as usize);
+                } else {
+                    let off = val_or_offset as usize;
+                    for j in 0..count {
+                        if typ == 3 {
+                            if let Some(val) = read_u16(data, off + j * 2) {
+                                strip_offsets.push(val as usize);
+                            }
+                        } else if let Some(val) = read_u32(data, off + j * 4) {
+                            strip_offsets.push(val as usize);
+                        }
+                    }
+                }
+            }
+            279 => {
+                if count == 1 {
+                    strip_byte_counts.push(val_or_offset as usize);
+                } else {
+                    let off = val_or_offset as usize;
+                    for j in 0..count {
+                        if typ == 3 {
+                            if let Some(val) = read_u16(data, off + j * 2) {
+                                strip_byte_counts.push(val as usize);
+                            }
+                        } else if let Some(val) = read_u32(data, off + j * 4) {
+                            strip_byte_counts.push(val as usize);
+                        }
+                    }
+                }
+            }
+            320 => {
+                colormap_offset = Some(val_or_offset as usize);
+                colormap_count = count;
+            }
+            _ => {}
+        }
+    }
+
+    let width = width?;
+    let height = height?;
+
+    if compression != 1 || photometric != 3 || colormap_count < 768 {
+        return None;
+    }
+    let colormap_off = colormap_offset?;
+
+    let mut red_map = [0u8; 256];
+    let mut green_map = [0u8; 256];
+    let mut blue_map = [0u8; 256];
+
+    for idx in 0..256 {
+        red_map[idx] = (read_u16(data, colormap_off + idx * 2)? >> 8) as u8;
+        green_map[idx] = (read_u16(data, colormap_off + (256 + idx) * 2)? >> 8) as u8;
+        blue_map[idx] = (read_u16(data, colormap_off + (512 + idx) * 2)? >> 8) as u8;
+    }
+
+    let total_pixels = (width as usize) * (height as usize);
+    let mut rgba = Vec::with_capacity(total_pixels * 4);
+
+    let spp = samples_per_pixel as usize;
+    if spp != 1 && spp != 2 {
+        return None;
+    }
+
+    let mut pixels_written = 0;
+    for (&strip_off, &strip_len) in strip_offsets.iter().zip(strip_byte_counts.iter()) {
+        let strip_data = data.get(strip_off..strip_off + strip_len)?;
+        let mut i = 0;
+        while i + spp <= strip_data.len() && pixels_written < total_pixels {
+            let palette_idx = strip_data[i] as usize;
+            let alpha = if spp == 2 { strip_data[i + 1] } else { 255u8 };
+
+            rgba.push(red_map[palette_idx]);
+            rgba.push(green_map[palette_idx]);
+            rgba.push(blue_map[palette_idx]);
+            rgba.push(alpha);
+
+            pixels_written += 1;
+            i += spp;
+        }
+    }
+
+    if pixels_written == total_pixels {
+        let img = RgbaImage::from_raw(width, height, rgba)?;
+        Some(DynamicImage::ImageRgba8(img))
+    } else {
+        None
+    }
 }
 
 fn extract_epsi_preview(data: &[u8]) -> Option<DynamicImage> {
@@ -755,6 +926,54 @@ showpage
             let img = open_image(candidate).expect("render vectorized-result.eps");
             assert!(img.width() > 0 && img.height() > 0);
             let preview = preview_data_url(candidate).expect("preview data url");
+            assert!(preview.starts_with("data:image/jpeg;base64,"));
+        }
+    }
+
+    #[test]
+    fn eps_with_xmp_xml_entities_works() {
+        let path = std::env::temp_dir().join(format!("metalizer-eps-xmp-entities-{}.eps", std::process::id()));
+
+        // Create a 16x16 test JPEG
+        let jpeg_img = DynamicImage::ImageRgb8(image::RgbImage::new(16, 16));
+        let mut jpeg_bytes = Vec::new();
+        jpeg_img.write_to(&mut Cursor::new(&mut jpeg_bytes), ImageFormat::Jpeg).expect("encode test JPEG");
+        let b64 = STANDARD.encode(&jpeg_bytes);
+        // Inject &#xA; and &#xD; like Adobe Illustrator does
+        let mut b64_with_entities = String::new();
+        for chunk in b64.as_bytes().chunks(40) {
+            b64_with_entities.push_str(std::str::from_utf8(chunk).unwrap());
+            b64_with_entities.push_str("&#xA;&#xD;\n");
+        }
+
+        let eps_content = format!(
+            "%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 1024 768\n<xmpGImg:image>\n{}\n</xmpGImg:image>\n",
+            b64_with_entities
+        );
+
+        fs::write(&path, eps_content.as_bytes()).expect("write EPS XMP entities fixture");
+
+        let image = open_image(&path).expect("read EPS XMP preview with XML entities");
+        assert_eq!((image.width(), image.height()), (16, 16));
+
+        fs::remove_file(path).expect("remove EPS fixture");
+    }
+
+    #[test]
+    fn eps_3_eps_file_renders_successfully() {
+        let candidate = Path::new("../3.eps");
+        if candidate.exists() {
+            let dims = read_dimensions(candidate).expect("read 3.eps dimensions");
+            assert_eq!(dims, (2000, 2000));
+            let img = open_image(candidate).expect("render 3.eps");
+            assert!(img.width() > 0 && img.height() > 0);
+
+            // Verify it is not all black
+            let rgba = img.to_rgba8();
+            let has_non_black = rgba.pixels().any(|p| p[0] > 0 || p[1] > 0 || p[2] > 0);
+            assert!(has_non_black, "3.eps should not be blank black!");
+
+            let preview = preview_data_url(candidate).expect("preview data url for 3.eps");
             assert!(preview.starts_with("data:image/jpeg;base64,"));
         }
     }

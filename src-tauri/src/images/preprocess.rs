@@ -690,12 +690,14 @@ fn convert_eps_to_svg_data(data: &[u8], bounds: EpsBounds) -> Option<Vec<u8>> {
             "closepath" => {
                 current_path.push_str("Z ");
             }
-            "fill" => {
+            "fill" | "eofill" => {
                 if !current_path.is_empty() {
+                    let fill_rule = if tok == "eofill" { "evenodd" } else { "nonzero" };
                     svg.push_str(&format!(
-                        r#"<path d="{}" fill="{}" stroke="none"/>"#,
+                        r#"<path d="{}" fill="{}" fill-rule="{}" stroke="none"/>"#,
                         current_path.trim_end(),
-                        color
+                        color,
+                        fill_rule
                     ));
                     operations_count += 1;
                 }
@@ -886,6 +888,45 @@ mod tests {
         assert!(err.to_string().contains("File EPS tidak memiliki embedded preview"));
 
         fs::remove_file(path).expect("remove plain EPS fixture");
+    }
+
+    #[test]
+    fn eps_evenodd_fill_renders_artwork_and_preserves_holes() {
+        // Both contours have the same winding: eofill leaves a hole, fill paints it.
+        for (operator, rule, center_alpha) in [("eofill", "evenodd", 0), ("fill", "nonzero", 255)] {
+            let eps = format!(r#"%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 100 100
+save
+0 100 translate
+1 -1 scale
+gsave
+1 0 0 setrgbcolor
+newpath
+10 10 moveto
+90 10 lineto
+90 90 lineto
+10 90 lineto
+closepath
+30 30 moveto
+70 30 lineto
+70 70 lineto
+30 70 lineto
+closepath
+{operator}
+grestore
+restore
+showpage
+"#);
+            let data = eps.as_bytes();
+            assert_eq!(parse_eps_bounding_box(data), Some((100, 100)));
+            let svg = convert_eps_to_svg_data(data, parse_eps_bounds(data).unwrap()).unwrap();
+            assert!(String::from_utf8_lossy(&svg).contains(&format!("fill-rule=\"{rule}\"")));
+            let preview = extract_eps_preview(data).expect("render EPS without embedded preview").to_rgba8();
+            assert_eq!(preview.dimensions(), (100, 100));
+            assert_eq!(preview.get_pixel(20, 20).0, [255, 0, 0, 255], "artwork must be visible");
+            assert_eq!(preview.get_pixel(50, 50).0[3], center_alpha, "fill rule must preserve hole semantics");
+            assert_eq!(preview.get_pixel(5, 5).0[3], 0, "outside artwork remains transparent");
+        }
     }
 
     #[test]
